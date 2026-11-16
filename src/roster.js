@@ -93,7 +93,7 @@ export const ROSTER = [
     },
     apply: (u) => {
       u.jumpV *= 1.32;          // a tap is already a committed hop
-      u.ropeSpeed *= 0.865;     // and the sweep runs on the old 1.3s clock
+      u.ropeSpeed *= 0.865;     // and her sweep runs a beat slow: 1.16s a turn
       u.holdLift *= 2.0;        // hold, and the stage leaves
       u.holdMax = 0.55;
       u.airJumps += 1;          // the old double, for the landings that were not

@@ -140,7 +140,9 @@ do not jiggle, so the acting is silhouette - squash, tuck, lean, hair.
 
 Skips raise a level. Each level offers three randomly drawn cards from ten, and you keep
 one. Cards stack: jump height, extra ropes, rope speed, rocket laces, fire, better draws,
-slower falls, wider timing, a mid-air hop, and a running multiplier.
+slower falls, wider timing, a mid-air hop, and a running multiplier. Rope speed is on that
+list and nowhere else: the sweep holds one revolution a second for the whole run, so the
+timing learned on the first jump is still true at minute nine.
 
 Rockets refill on every pick, which is the trick that turns the game from a jump-and-time
 loop into a hover-and-dodge loop. There is no meta-progression and no unlock tree: every
@@ -167,7 +169,7 @@ her. Nothing you earn carries between runs.
 | Where | Knob | Effect |
 | ----- | ---- | ------ |
 | `game.js` | `JUMP_V`, `G` | airtime, and therefore the timing window |
-| `game.js` | `BASE_SPEED` | rope revolutions per second |
+| `game.js` | `BASE_SPEED` | sweep cadence: one revolution a second |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
 | `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |

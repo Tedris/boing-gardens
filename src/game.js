@@ -16,13 +16,14 @@ const HOLD_MAX = 0.40;       // seconds of hold assist
 const CHAR_KEY = 'boing-gardens-char';
 const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
 const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
-const BASE_SPEED = (Math.PI * 2) / 1.05;
+const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
+                                         // lands on the sweep, slower and the rope stops driving
 
 // The press that starts a run is also its first jump, so that one arc has to still
 // be airborne when the rope comes round: half a sweep for the rope to get from
-// overhead to her feet, and the base hop lands 0.04s short of that. Scaling the
-// launch off the base hop keeps it honest when the jump cards move.
-const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.23x
+// overhead to her feet, and the base hop lands 0.01s short of that. Scaling the launch off
+// the base hop keeps it honest when the jump cards move.
+const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.18x
 const BEST_KEY = 'boing-gardens-best';
 
 // Framing: a slight three-quarter view, not a flat lay. Dead-on, every box collapses to
@@ -142,7 +143,7 @@ export function createGame(stage) {
       fuel: 0, fuelMax: 0, fire: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
       levels: {}, skips: 0, score: 0, level: 1, xpNeed: 12, xpBase: 0,
-      alt: 0, altMax: 0, sinceSkip: 0, time: 0,
+      alt: 0, altMax: 0, sinceSkip: 0,
     });
     // who is jumping decides the starting numbers; cards stack on top of that
     who().apply(u);
@@ -517,7 +518,6 @@ export function createGame(stage) {
         char.puff(0, 0.05, 0.1, 0.9);
       }
     } else if (state === 'run') {
-      u.time += dt;
       if (pressEdge) {
         if (grounded) {
           vy = u.jumpV;
@@ -586,7 +586,9 @@ export function createGame(stage) {
       const dy = y - char.group.position.y;
       hands[0].y += dy;
       hands[1].y += dy;
-      const speed = state === 'run' ? u.ropeSpeed * (1 + Math.min(0.35, u.time * 0.004)) : 0;
+      // One revolution a second, and that rate is the whole story: nothing here speeds the
+      // sweep up because the run got long. Rope speed is a card, so it changes when one says so.
+      const speed = state === 'run' ? u.ropeSpeed : 0;
       ropeBottom = ropes.update(state === 'run' ? dt : 0, {
         hands, speed, length: ROPE_A, ground: 0, fire: u.fire > 0, time,
       });
