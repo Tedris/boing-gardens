@@ -94,6 +94,7 @@ export function ink(mesh, grow = 0.028, soft = false) {
 /** Mesh factory: geometry + toon skin + optional outline, in one call. */
 export function part(geo, color, o = {}) {
   const m = new THREE.Mesh(geo, toon(color, o));
+  m.userData.col = color;    // the roster recolours by base palette value
   m.castShadow = o.shadow !== false;
   m.receiveShadow = !!o.receive;
   if (o.ink !== 0) ink(m, o.ink ?? 0.028);

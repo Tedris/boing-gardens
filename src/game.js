@@ -5,6 +5,7 @@ import { createWorld } from './world.js';
 import { createCharacter } from './character.js';
 import { createRopes } from './rope.js';
 import { CARDS, drawCards } from './cards.js';
+import { ROSTER, byId } from './roster.js';
 import { sfx } from './audio.js';
 import { canvasTex, spring, springState } from './toon.js';
 
@@ -12,6 +13,7 @@ const G = 23.5;              // gravity, m/s^2
 const JUMP_V = 5.75;         // base takeoff speed -> ~0.7m apex, ~0.49s airtime
 const HOLD_LIFT = 9.5;       // extra upward accel while holding on the way up
 const HOLD_MAX = 0.40;       // seconds of hold assist
+const CHAR_KEY = 'boing-gardens-char';
 const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
 const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
 const BASE_SPEED = (Math.PI * 2) / 1.05;
@@ -96,6 +98,9 @@ export function createGame(stage) {
     sBest: document.getElementById('s-best'),
     flash: document.getElementById('flash'),
     paused: document.getElementById('paused'),
+    pick: document.getElementById('pick'),
+    pickRow: document.querySelector('#pick .row'),
+    pickName: document.getElementById('pick-name'),
   };
 
   // ---------------- input mode ----------------
@@ -122,10 +127,12 @@ export function createGame(stage) {
     Object.assign(u, {
       jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, thrust: 0,
       fuel: 0, fuelMax: 0, fire: 0, offer: 3, fallDrag: 1, landEase: 1,
-      grace: 0, airJumps: 0, combo: 0, mult: 1,
+      grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
       levels: {}, skips: 0, score: 0, level: 1, xpNeed: 12, xpBase: 0,
       alt: 0, altMax: 0, sinceSkip: 0, time: 0,
     });
+    // who is jumping decides the starting numbers; cards stack on top of that
+    who().apply(u);
     y = 0; vy = 0; grounded = true; holdT = 0; holding = false;
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
@@ -148,8 +155,6 @@ export function createGame(stage) {
   const sDip = springState();
   const hands = [V3(), V3()];
   let offerCards = [];
-
-  freshRun();
 
   // ---------------- HUD paint ----------------
   function renderOwned() {
@@ -317,6 +322,70 @@ export function createGame(stage) {
     char.bump(0.8, 0.3);
   }
 
+  // ---------------- who is jumping ----------------
+  // The roster is a choice made once and remembered. The look is the same rig
+  // recoloured and rescaled (character.js setLook); the physics is a patch over a
+  // fresh run, so a jumper and an upgrade deck compose instead of fighting.
+  let charId = byId(localStorage.getItem(CHAR_KEY)).id;
+  const who = () => byId(charId);
+
+  function setCharacter(id) {
+    const c = byId(id);
+    charId = c.id;
+    localStorage.setItem(CHAR_KEY, charId);
+    char.setLook(c.look);
+    el.pickName.textContent = c.name;
+    [...el.pickRow.children].forEach((d, i) => d.classList.toggle('sel', ROSTER[i].id === charId));
+  }
+
+  /** The roster row is the draft's panel with different cards in it, because it is
+      the same decision: take one of these, with a number under it. */
+  function showSelect() {
+    state = 'select';
+    el.pickRow.innerHTML = '';
+    ROSTER.forEach((c, i) => {
+      const d = document.createElement('div');
+      d.className = 'card' + (c.id === charId ? ' sel' : '');
+      d.innerHTML =
+        `<div class="ic">${c.icon}</div><div class="nm">${c.name}</div>` +
+        `<div class="ds">${c.blurb}</div>` +
+        `<div class="key">PRESS ${i + 1}</div>`;
+      d.onclick = () => pickChar(i);
+      el.pickRow.appendChild(d);
+    });
+    el.pickName.textContent = who().name;   // the cards carry the .sel mark already
+    el.screen.classList.add('off');          // the roster replaces the title, it does not sit on it
+    el.pick.classList.add('on');
+    el.skips.classList.add('hide');
+    hint('');
+  }
+
+  function pickChar(i) {
+    if (state !== 'select') return;
+    const c = ROSTER[i];
+    if (!c) return;
+    setCharacter(c.id);
+    freshRun();     // the numbers have to change now, not on the run after this one
+    el.pick.classList.remove('on');
+    el.skips.classList.remove('hide');
+    state = 'ready';
+    sfx.pick();
+    hint(touchUI ? 'tap to start the rope' : 'press to start the rope');
+  }
+
+  /** C or the swap button steps through the roster, but only while nothing is in
+      motion: changing legs mid-run would be a different run, not a shortcut. */
+  function cycleCharacter() {
+    if (paused || state === 'run' || state === 'draft' || state === 'select') return;
+    const i = ROSTER.findIndex((c) => c.id === charId);
+    setCharacter(ROSTER[(i + 1) % ROSTER.length].id);
+    freshRun();     // same reason as in pickChar
+  }
+
+  // boot: the look and the label; resetRun() below seeds the run numbers, once
+  // charId exists for freshRun to ask who is jumping
+  setCharacter(charId);
+
   function resetRun() {
     freshRun();
     resetScreen();
@@ -334,8 +403,9 @@ export function createGame(stage) {
     // it happened to be, so resuming has to be a beat to itself before the next
     // one is due, rather than a hop at a rope position nobody chose.
     if (paused) { setPause(false); return; }
-    if (state === 'title' || state === 'over') { startRun(); return; }
-    if (state === 'draft') return;
+    if (state === 'title') { showSelect(); return; }   // one look at the roster first
+    if (state === 'over') { startRun(); return; }
+    if (state === 'draft' || state === 'select') return;
     down = true;
     pressEdge = true;
   }
@@ -360,6 +430,7 @@ export function createGame(stage) {
 
   function pick(i) {
     if (state === 'draft') takeCard(i);
+    else if (state === 'select') pickChar(i);
   }
 
   // ---------------- step ----------------
@@ -413,13 +484,13 @@ export function createGame(stage) {
         }
       }
 
-      holding = down && vy > 0 && holdT < HOLD_MAX;
+      holding = down && vy > 0 && holdT < u.holdMax;
       thrusting = !grounded && down && u.thrust > 0 && u.fuel > 0;
       if (holding) holdT += dt;
       if (thrusting) u.fuel = Math.max(0, u.fuel - dt / Math.max(0.2, u.fuelMax));
 
       let a = -G * (vy < 0 ? u.fallDrag : 1);
-      if (holding) a += HOLD_LIFT;
+      if (holding) a += u.holdLift;
       if (thrusting) a += u.thrust;
       vy += a * dt;
       y += vy * dt;
@@ -570,14 +641,14 @@ export function createGame(stage) {
 
   return {
     renderer, scene, camera, step, resize, press, release, pick, setTouchUI,
-    setPause, togglePause,
+    setPause, togglePause, setCharacter, cycleCharacter, showSelect,
     get state() { return state; },
     get rig() { return char.rig; },
     get debug() {
       return {
         y, vy, grounded, skips: u.skips, ropes: u.ropes, alt: u.altMax,
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
-        holding, thrusting, down, paused,
+        holding, thrusting, down, paused, char: charId,
         phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
       };
     },

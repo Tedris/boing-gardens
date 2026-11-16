@@ -22,12 +22,21 @@ One button does everything: space / up / W / click / tap.
 | Hold    | stay up longer on the way up; burn rocket fuel in the air |
 | Release | let the arc fall                                         |
 | 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |
+| 1 – 4     | pick a jumper on the roster panel (on touch, tap the card)   |
 | M       | mute                                                     |
 | P / Esc | pause, or resume                                           |
+| C       | swap jumper, but only while nothing is in motion             |
 
 A run ends when a rope reaches the bottom of its sweep while a foot is still on the dirt.
 With more than one rope a trip costs a rope instead of the run: the sweep restarts at
 the top and she stumble-hops back in, so the last rope is the one that ends it.
+
+The title opens the roster before it lets a run start, because the jumper is the first
+decision and there is no reason to hide it behind a menu: four of them, one rig. `C` or
+the swap button steps through the list without opening the panel, and both are refused
+while a run is live — swapping legs mid-run would be a different run, not a shortcut.
+Picking re-seeds the run numbers where it happens (`pickChar`), since numbers that only
+arrive on the *next* run read as a dead button.
 
 A run also pauses itself when the tab or window loses focus, so an alt-tab or an
 app switch is never a wipeout. On a phone the pause button is the only way in and
@@ -73,6 +82,10 @@ is what keeps it readable at any rope count or height:
   stretch, lean, nod, hair strands, and soft-body bounce; a two-bone IK (`reach`) aims the
   hands at the anchors the rope hangs from, so the arm pose is a *consequence* of the rope
   instead of a keyframed guess that has to match it.
+- `roster.js` — the four jumpers as a table, not four engines: `look` is a palette remap
+  plus shape scalars handed to `character.js:setLook`, and `apply` patches a fresh run's
+  numbers in the same style as a card, so a character is a starting build that cards still
+  stack on top of. The blurb is the spec — if she falls like a rumour, `fallDrag` says so.
 - `rope.js` — each rope is a real arc rotating around the hand axis, beaded so the sweep
   is legible and the stripes read at speed. It turns the way a rope actually turns - down
   the front, under the feet, up the back - so depth enters as `-sin(theta)` and the hand
@@ -103,12 +116,14 @@ slower falls, wider timing, a mid-air hop, and a running multiplier.
 
 Rockets refill on every pick, which is the trick that turns the game from a jump-and-time
 loop into a hover-and-dodge loop. There is no meta-progression and no unlock tree: every
-run starts from the same numbers.
+run starts from the same numbers, other than the ones the jumper you picked brought with
+her. Nothing you earn carries between runs.
 
 ## Staying clear of anyone's IP
 
 - Name, character design, palette, UI copy and card names are original. She has a teal bob
-  and a hair clip, not anyone else's silhouette.
+  and a hair clip, not anyone else's silhouette, and the other three jumpers are that one
+  rig recoloured and re-tuned rather than four borrowed designs.
 - Geometry, textures, canvas-drawn face atlas and audio are generated in this repo. No
   imported model, texture, audio or font files exist here.
 - Mechanics are not owned: one button, a jump rope, three-card drafts and stacking
@@ -128,12 +143,13 @@ run starts from the same numbers.
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
 | `character.js` | `J` | spring stiffness, damping and travel limits |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |
+| `roster.js` | `ROSTER` | the four jumpers: look, blurb and starting numbers |
 
 ## Checks
 
 No build step and no test suite; behaviour was verified in a browser at 1280x720:
-title → run → level-up draft → card pick by key → trip → game over → restart, plus
-60 fps at three ropes, multi-hundred-metre altitude frames, and per-frame sampling of the
-soft-body springs to confirm they travel asymmetrically instead of sitting at their
-clamps. `window.game.debug` exposes live state (`y`, `vy`, `phase`, `skips`, `state`) and
+title → roster → pick by key → run → level-up draft → card pick by key → trip → game over
+→ restart, plus 60 fps at three ropes, multi-hundred-metre altitude frames, and per-frame
+soft-body springs to confirm they travel asymmetrically instead of sitting at their clamps.
+`window.game.debug` exposes live state (`y`, `vy`, `phase`, `skips`, `state`, `char`) and
 `window.game.script` can drive input and grant cards, which is how those runs were driven.

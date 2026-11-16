@@ -125,17 +125,19 @@
   #hint.off{opacity:0}
 
   /* ---- card draft ---- */
-  #draft{
+  #draft,#pick{
     position:fixed;inset:0;display:none;place-items:center;z-index:7;
     background:radial-gradient(120% 90% at 50% 40%,rgba(13,20,32,.55),rgba(13,20,32,.86));
   }
-  #draft.on{display:grid}
-  #draft h2{
+  #draft.on,#pick.on{display:grid}
+  #draft h2,#pick h2{
     position:absolute;top:9vh;left:50%;transform:translateX(-50%);
     font-size:min(7vh,58px);color:#fff;-webkit-text-stroke:7px var(--ink);
     paint-order:stroke fill;letter-spacing:.02em;
   }
-  #draft .row{display:flex;gap:min(2.2vw,26px);align-items:stretch}
+  #draft .row,#pick .row{display:flex;gap:min(2.2vw,26px);align-items:stretch}
+  /* the roster is four wide where the draft is three */
+  #pick .card{width:min(21vw,206px)}
   .card{
     width:min(25vw,238px);padding:20px 18px 18px;border-radius:20px;
     background:var(--paper);color:var(--ink);border:5px solid var(--ink);
@@ -143,6 +145,7 @@
     transition:transform .13s ease-out;
   }
   .card:hover,.card.sel{transform:translateY(-12px) rotate(-1.2deg) scale(1.03)}
+  #pick .card.sel{border-color:var(--lime)}
   .card .ic{font-size:44px;line-height:1}
   .card .nm{font-size:21px;font-weight:900;margin:10px 0 6px;line-height:1.1}
   .card .ds{font-size:13.5px;line-height:1.35;opacity:.85;min-height:4.2em}
@@ -152,7 +155,7 @@
     padding:3px 9px;border-radius:999px;
   }
   .card .key{margin-top:9px;font-size:11px;letter-spacing:.16em;opacity:.55}
-  #draft .foot{
+  #draft .foot,#pick .foot{
     position:absolute;bottom:7vh;left:50%;transform:translateX(-50%);
     font-size:12.5px;letter-spacing:.14em;opacity:.7;
   }
@@ -189,9 +192,9 @@
   #screen .stats b{display:block;font-size:34px;-webkit-text-stroke:4px var(--ink);paint-order:stroke fill}
   #screen .legal{margin-top:26px;font-size:11px;opacity:.5;line-height:1.6}
 
-  /* the two corner buttons: both are excluded from the tap-anywhere jump by
-     main.js, so hitting them is never also a hop */
-  #mute,#pause{
+  /* the three corner buttons: all are excluded from the tap-anywhere jump by
+     main.js, so hitting one is never also a hop */
+  #mute,#pause,#swap{
     position:fixed;bottom:calc(3vh + env(safe-area-inset-bottom));width:var(--ctl);height:var(--ctl);
     border-radius:50%;background:rgba(27,18,38,.6);border:2px solid rgba(255,255,255,.16);
     color:var(--paper);cursor:pointer;
@@ -201,6 +204,7 @@
     right:calc(1.6vw + env(safe-area-inset-right) + var(--ctl) + 10px);
     font-size:14px;font-weight:900;letter-spacing:-.06em;
   }
+  #swap{right:calc(1.6vw + env(safe-area-inset-right) + 2 * (var(--ctl) + 10px));font-size:17px}
 
   /* physics is frozen behind this, so it is a state, not a menu */
   #paused{
@@ -234,7 +238,8 @@
   /* Phones: three cards across a portrait screen is unreadable, so the draft
      stacks and every card becomes a row a thumb can actually hit. */
   @media (pointer: coarse), (max-width: 720px){
-    #draft .row{flex-direction:column;gap:12px;max-height:80vh;overflow:auto}
+    #draft .row,#pick .row{flex-direction:column;gap:12px;max-height:80vh;overflow:auto}
+    #pick .card{width:min(90vw,360px)}
     .card{
       width:min(90vw,360px);display:grid;grid-template-columns:56px 1fr;column-gap:12px;
       align-items:center;text-align:left;padding:14px 16px;box-shadow:0 7px 0 var(--ink);
@@ -245,7 +250,7 @@
     .card .lv{grid-column:2;grid-row:3;justify-self:start}
     .card .key{grid-column:2;grid-row:4;justify-self:start}
     .card:hover,.card.sel{transform:none}
-    #draft h2{font-size:min(6vh,44px);top:5vh;white-space:nowrap}
+    #draft h2,#pick h2{font-size:min(6vh,44px);top:5vh;white-space:nowrap}
     #screen h1{font-size:min(8.5vh,58px)}
     /* the staggered second line must clear a 393px-wide screen */
     #screen h1 span{margin-left:min(1.6em,9vw)}
@@ -266,8 +271,9 @@
     #screen .stats b{font-size:26px}
     #screen .go{margin-top:14px;font-size:min(5vh,26px)}
     #screen .legal{margin-top:10px;font-size:9px;line-height:1.4}
-    #draft h2{font-size:min(9vh,40px);top:3vh}
-    #draft .row{gap:min(1.6vw,14px);flex-wrap:nowrap}
+    #draft h2,#pick h2{font-size:min(9vh,40px);top:3vh}
+    #draft .row,#pick .row{gap:min(1.6vw,14px);flex-wrap:nowrap}
+    #pick .card{width:min(21vw,178px)}
     .card{padding:10px 12px;width:min(27vw,230px)}
     .card .ds{display:none}
     #pill{height:66vh;top:16vh}
@@ -317,8 +323,16 @@
     </div>
   </div>
 
+  <button id="swap" title="swap jumper (C)" aria-label="swap jumper">&#8644;</button>
   <button id="pause" title="pause (P)" aria-label="pause">&#10073;&#10073;</button>
   <button id="mute" title="mute (M)" aria-label="mute">&#9835;</button>
+
+  <div id="pick">
+    <h2>PICK A JUMPER</h2>
+    <div class="row"></div>
+    <div class="foot">NOW JUMPING <b id="pick-name">Boing</b>
+      &nbsp;·&nbsp; <span class="kbd">OR PRESS 1 / 2 / 3 / 4 &nbsp;·&nbsp; C SWAPS</span><span class="tch">TAP ONE &nbsp;·&nbsp; THE SWAP BUTTON CHANGES</span></div>
+  </div>
 
   <div id="paused"><div><b>PAUSED</b><p><span class="kbd">PRESS P OR SPACE</span><span class="tch">TAP ANYWHERE</span></p></div></div>
 

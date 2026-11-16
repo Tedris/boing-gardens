@@ -25,6 +25,8 @@ addEventListener('keydown', (e) => {
     toggleMute();
   } else if (e.code === 'KeyP' || e.code === 'Escape') {
     togglePause();
+  } else if (e.code === 'KeyC') {
+    game.cycleCharacter();
   }
 });
 addEventListener('keyup', (e) => {
@@ -35,7 +37,7 @@ addEventListener('keyup', (e) => {
 // on the window because #screen and #draft cover the canvas, so a tap on the
 // title or on the backdrop never reached #stage - with the listener on the
 // stage, a touch-only machine could not start a run at all.
-const isControl = (t) => !!(t && t.closest && t.closest('#mute, #pause, .card'));
+const isControl = (t) => !!(t && t.closest && t.closest('#mute, #pause, #swap, .card'));
 const down = (e) => {
   if (e.pointerType === 'touch') game.setTouchUI(true);
   if (e.button !== undefined && e.button > 0) return;
@@ -99,6 +101,11 @@ pauseBtn.addEventListener('click', (e) => {
   togglePause();
 });
 paintPause();
+
+document.getElementById('swap').addEventListener('click', (e) => {
+  e.stopPropagation();
+  game.cycleCharacter();
+});
 
 let last = performance.now();
 function frame(now) {

@@ -130,6 +130,10 @@ export function createCharacter() {
   const group = new THREE.Group();
   const rig = {};
 
+  // Same rig, different body: three scalars and a colour map, applied by setLook.
+  // Kept in one object so update() reads it in the same places every frame.
+  let look = { w: 1, h: 1, squash: 1, jig: 1 };
+
   const body = new THREE.Group();
   group.add(body);
   rig.body = body;
@@ -543,8 +547,8 @@ export function createCharacter() {
     // ---- squash & stretch: stretch while moving fast, squash on impact ----
     const stretch = clamp(vy * 0.016, -0.2, 0.26) + jig.p;
     const crouch = spring(sCrouch, s.grounded ? Math.max(0, 0.05 - Math.abs(vy) * 0.01) : 0, 120, 14, dt);
-    const sq = clamp(stretch - crouch * 1.6, -0.34, 0.4);
-    body.scale.set(1 - sq * 0.5, 1 + sq, 1 - sq * 0.5);
+    const sq = clamp((stretch - crouch * 1.6) * look.squash, -0.34 * look.squash, 0.4);
+    body.scale.set((1 - sq * 0.5) * look.w, (1 + sq) * look.h, (1 - sq * 0.5) * look.w);
 
     // ---- whole-body lean from vertical motion / thrust ----
     const leanTarget = clamp(vy * 0.017, -0.24, 0.3) + (s.thrust ? 0.42 : 0) + (s.dead ? 0.2 : 0);
@@ -606,15 +610,15 @@ export function createCharacter() {
     // one shared kick: vertical acceleration sets how far everything hangs
     const gKick = -ay;
     bust.forEach((b, i) => {
-      const gy = gKick * J.bust.g * b.gain;
-      const up = clamp(springKick(b.up, 0, gy - 0.6 * Math.sin(t * 2.2 + i), J.bust.k, J.bust.d, dt), -J.bust.max, J.bust.max);
-      const side = clamp(springKick(b.side, 0, Math.sin(t * 1.6 + i * 1.7) * 0.25, 62, 9.5, dt), -0.03, 0.03);
+      const gy = gKick * J.bust.g * b.gain * look.jig;
+      const up = clamp(springKick(b.up, 0, gy - 0.6 * look.jig * Math.sin(t * 2.2 + i), J.bust.k, J.bust.d, dt), -J.bust.max, J.bust.max);
+      const side = clamp(springKick(b.side, 0, Math.sin(t * 1.6 + i * 1.7) * 0.25 * look.jig, 62, 9.5, dt), -0.03, 0.03);
       const spin = clamp(springKick(b.spin, 0, -lean * 2.2, 70, 9, dt), -0.3, 0.3);
       b.g.position.set(b.base.x + side, b.base.y + up - 0.006, b.base.z + (up < 0 ? up * 0.3 : 0));
       b.g.rotation.set(spin * 0.4, 0, side * 2.2);
     });
     butt.forEach((b, i) => {
-      const up = clamp(springKick(b.up, 0, gKick * J.butt.g * b.gain, J.butt.k, J.butt.d, dt), -J.butt.max, J.butt.max);
+      const up = clamp(springKick(b.up, 0, gKick * J.butt.g * b.gain * look.jig, J.butt.k, J.butt.d, dt), -J.butt.max, J.butt.max);
       b.g.position.set(b.base.x, b.base.y + up * 0.6, b.base.z + up * 0.5);
     });
 
@@ -683,11 +687,24 @@ export function createCharacter() {
 
   }
 
+  /** Re-skin and re-proportion without rebuilding anything: colours are remapped
+      from the base palette value each part recorded, so switching back and forth
+      is exact, and the shape is three scalars the animator already multiplies. */
+  function setLook(l = {}) {
+    look = { w: 1, h: 1, squash: 1, jig: 1, ...l };
+    const tint = l.tint || {};
+    group.traverse((m) => {
+      if (!m.isMesh || m.userData.col === undefined) return;
+      m.material.color.set(tint[m.userData.col] ?? m.userData.col);
+    });
+  }
+
   return {
     group,
     rig,
     hands,
     update,
+    setLook,
     bump,
     puff,
     /** hand world positions, for the rope to hang from */
