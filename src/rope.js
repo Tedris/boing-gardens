@@ -15,6 +15,7 @@ const R = 0.08;         // rope thickness: at 240 rows this is a four-pixel band
                         // what survives the upscale; thinner reads as a hairline
 const BOW = 1.0;        // extra lateral spread aloft, added at the mid-rope
 const MAXR = 6;          // rope ceiling
+const LAG = Math.PI * 0.5; // phase step between ropes: a quarter turn, 0.25 s at the base cadence
 const UP = new THREE.Vector3(0, 1, 0);
 const GQ = new THREE.Quaternion();
 
@@ -80,12 +81,23 @@ export function createRopes() {
   function setCount(n) {
     for (let i = 0; i < MAXR; i++) {
       const r = ropes[i];
+      const was = r.active;
       r.active = i < n;
       r.beads.visible = r.active;
       r.radius = i * 0.055;
-      // clustered phases: one well-timed jump clears every rope and each sweep
-      // scores, so an extra rope reads as more skips, not a wider death window
-      r.offset = i * 0.3;
+      r.offset = i * LAG;
+      // A rope that has been sitting inactive does not advance, so its own angle is from
+      // the last reset and says nothing about where the sweep is now. Park a rope joining
+      // mid-run a quarter turn behind the one it joins, measured off that rope's live angle
+      // - otherwise it appears at the top of the arc whenever the card happened to be
+      // picked, which is either a free skip or an instant trip.
+      if (r.active && !was && i > 0) {
+        const prev = ropes[i - 1];
+        const abs = prev.theta + prev.offset - LAG;
+        r.theta = abs - r.offset;
+        r.prevAbs = abs;
+        r.crossed = false;
+      }
     }
   }
 
@@ -188,9 +200,18 @@ export function createRopes() {
       }
       return lowest;
     },
-    /** reset all sweeps to the top of the arc */
+    /**
+     * Restart the sweep: the first rope at the top of the arc, so the pass that decides the
+     * next jump is half a revolution away. The rest keep their quarter-turn lag rather than
+     * being collapsed onto it - collapsed is what a restart after losing a rope would give,
+     * and surviving ropes all arriving in the same instant is one wide rope, not a fair sweep.
+     */
     reset() {
-      for (const r of ropes) { r.theta = Math.PI - r.offset; r.prevAbs = Math.PI; r.crossed = false; }
+      for (const r of ropes) {
+        r.theta = Math.PI - 2 * r.offset;   // abs = theta + offset = PI - offset
+        r.prevAbs = Math.PI - r.offset;
+        r.crossed = false;
+      }
     },
   };
 }

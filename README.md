@@ -117,6 +117,11 @@ is what keeps it readable at any rope count or height:
   The rope hangs from her hands, and matrices only refresh at draw time, so `game.js`
   adds the height gained since the last frame before asking where they are - at 100 m/s
   that is a two-metre error otherwise.
+  Extra ropes lag a quarter turn (`LAG`) behind the one before them, so at one revolution a
+  second the second rope arrives 0.25 s later - still inside the same hop, which is what makes
+  a second rope mean more skips rather than one thicker rope. A rope joining mid-run is parked
+  relative to the live sweep, because its own angle froze at the last reset and would otherwise
+  land it at the top of the arc whenever the card happened to be picked.
 - `world.js` - a dark stage that reads as one: a dusty floor slab, skyline silhouettes that
   swap as she climbs, a cloud band that recycles around the camera, sky that fades to space
   with stars tiering in above it. All altitude-driven, and the sky colour it returns *is*
@@ -176,6 +181,7 @@ her. Nothing you earn carries between runs.
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
+| `rope.js` | `LAG` | phase step between ropes: a quarter turn, so 0.25 s at the base cadence |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |
