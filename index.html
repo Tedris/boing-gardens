@@ -34,6 +34,11 @@
   #flash{z-index:8}
   canvas{display:block;width:100%;height:100%;touch-action:none}
 
+  /* the only channel a phone that never booted has to talk on */
+  #boot{display:none;position:fixed;left:0;right:0;bottom:0;z-index:9;padding:9px 12px;
+    padding-bottom:calc(9px + env(safe-area-inset-bottom));background:#5a0f22;color:#fff;
+    font:600 12px/1.45 ui-monospace,SFMono-Regular,monospace;pointer-events:none}
+
   /* chunky stroked numerals, drawn with layered shadows so it works offline */
   .stroke{
     -webkit-text-stroke:6px var(--ink);
@@ -289,6 +294,29 @@
 
   <button id="mute" title="mute (M)">&#9835;</button>
 
+  <div id="boot"></div>
+
+  <script>
+    /* Decided here, before any module runs, for two reasons. The copy has to be
+       right even if the WebGL boot dies on an older phone, and a phone that
+       shows nothing is otherwise indistinguishable from one whose taps are being
+       ignored. game.js reads this back; a first real finger still flips it. */
+    document.documentElement.dataset.touch =
+      (matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints || 0) > 0
+        || /Android|iPhone|iPad|iPod|KaiOS|Silk|Mobile Safari|Mobile\//i.test(navigator.userAgent))
+        ? '1' : '0';
+    const fail = (m) => {
+      const d = document.getElementById('boot');
+      if (d && d.style.display !== 'block') { d.textContent = 'did not start: ' + m; d.style.display = 'block' }
+    };
+    // capture: a module that 404s or will not parse fires at the element, and does not bubble
+    addEventListener('error', (e) => fail(e.message || (e.target && e.target.src
+      ? e.target.src.split('/').pop() + ' failed to load' : 'script error')), true);
+    addEventListener('unhandledrejection', (e) => fail('promise: ' + (e.reason && e.reason.message || e.reason)));
+    addEventListener('load', () => setTimeout(() => {
+      if (!window.game) fail('main.js never ran (a module this browser cannot parse?)');
+    }, 1500));
+  </script>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

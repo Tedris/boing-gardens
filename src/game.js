@@ -93,14 +93,13 @@ export function createGame(stage) {
 
   // ---------------- input mode ----------------
   // A phone has no keyboard, so the one button becomes a tap and the copy has to
-  // say so. A coarse pointer is the honest question to ask; main.js flips the
-  // answer on the first real touch, for machines that own both kinds of input.
-  // three signals, because each lies on its own: a coarse pointer (the honest
-  // one), a touch-capable device, and a mobile browser's own UA.
-  const MOBILE_UA = /Android|iPhone|iPad|iPod|KaiOS|Silk|Mobile Safari|Mobile\//i;
-  let touchUI = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints || 0) > 0
-    || MOBILE_UA.test(navigator.userAgent);
-  document.documentElement.dataset.touch = touchUI ? '1' : '0';
+  // say so. index.html settles the mode before any module runs, from a coarse
+  // pointer, a touch capability and a mobile browser's own UA: it has to be that
+  // early because the copy is also what tells a reader whose boot died that the
+  // page is a phone page, rather than looking like a phone whose taps are being
+  // ignored. This reads that back; main.js flips it on the first real finger,
+  // for machines that own both kinds of input.
+  let touchUI = document.documentElement.dataset.touch === '1';
   const goText = () => (touchUI ? 'TAP ANYWHERE' : 'PRESS SPACE');
   const goAgainText = () => (touchUI ? 'TAP TO GO AGAIN' : 'PRESS SPACE TO GO AGAIN');
   function setTouchUI(on) {

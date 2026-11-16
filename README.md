@@ -42,6 +42,14 @@ or muting would also be a jump. Layout follows `(pointer: coarse), (max-width:
 720px)` for stacked cards and `(max-height: 520px)` for landscape, with
 `env(safe-area-inset-*)` on every edge element under `viewport-fit=cover`.
 
+Browsers that never fire pointer events (iOS 12, a few in-app webviews) bind the
+older `touchstart`/`touchend` pairs instead, and `[data-touch]` is written by an
+inline script in `index.html` *before* the modules run, so a phone whose WebGL
+boot dies still reads TAP ANYWHERE rather than looking like a phone whose taps
+are being ignored. Anything that fails to load or throws on boot is named in a
+strip at the foot of the screen (`#boot`) for the same reason: from here, a
+phone that shows nothing and a phone that ignores input are the same report.
+
 ## How the look is made
 
 "3D that reads as 2D", the cheap way: a 22° camera on a dead-on axis with no rotation,

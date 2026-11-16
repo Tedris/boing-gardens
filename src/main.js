@@ -41,9 +41,23 @@ const down = (e) => {
   game.press();
 };
 const up = () => game.release();
-addEventListener('pointerdown', down);
-addEventListener('pointerup', up);
-addEventListener('pointercancel', up);
+// iOS 12 and a few in-app webviews never fire pointer events, which otherwise
+// leaves a fully rendered game wired to nothing at all: the taps simply have no
+// listener. Bind the older touch/mouse pairs there.
+if (window.PointerEvent) {
+  addEventListener('pointerdown', down);
+  addEventListener('pointerup', up);
+  addEventListener('pointercancel', up);
+} else {
+  addEventListener('touchstart', (e) => {
+    game.setTouchUI(true);
+    if (!isControl(e.target)) game.press();
+  }, { passive: true });
+  addEventListener('touchend', up);
+  addEventListener('touchcancel', up);
+  addEventListener('mousedown', down);
+  addEventListener('mouseup', up);
+}
 addEventListener('blur', () => { pressed = false; game.release(); });
 // stop the page from scrolling / long-press selecting on touch
 addEventListener('contextmenu', (e) => e.preventDefault());
