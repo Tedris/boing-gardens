@@ -36,7 +36,8 @@ decision and there is no reason to hide it behind a menu: five of them, one rig.
 the swap button steps through the list without opening the panel, and both are refused
 while a run is live — swapping legs mid-run would be a different run, not a shortcut.
 Picking re-seeds the run numbers where it happens (`pickChar`), since numbers that only
-arrive on the *next* run read as a dead button.
+arrive on the *next* run read as a dead button. The pick is not remembered across loads:
+every opening frame is the roster's first row, and a number changes the run in front of you.
 
 A run also pauses itself when the tab or window loses focus, so an alt-tab or an
 app switch is never a wipeout. On a phone the pause button is the only way in and
@@ -72,11 +73,13 @@ phone that shows nothing and a phone that ignores input are the same report.
 A PS1-era software renderer, approximated in two passes. The scene is real 3D - boxes,
 flat-shaded Lambert facets, one directional light, one fog - rendered into a 240-row
 target and then upscaled by hand: sRGB encode, 4x4 Bayer dither, quantise to 31 levels
-(`toon.js:createPost`). The camera is aimed, not aligned to the axes: a fixed 16-degree
-yaw and a slight tilt (`game.js:CAM_YAW`, `CAM_LIFT`), so she is a three-quarter figure —
+(`toon.js:createPost`). The camera is aimed, not aligned to the axes: a 17-degree yaw and a
+7.6-degree downcast (`game.js:CAM_YAW`, `CAM_LIFT`), so she is a three-quarter figure —
 one face of every box lit and one dark, and the rope's arc foreshortens as it turns
-instead of sliding down a flat plane. The angle is derived from the camera distance, so
-it holds as the camera eases back with height.
+instead of sliding down a flat plane. Both are derived from the distance she is seen at, 9 m
+down the depth axis, so the pose holds as the camera eases back with height. That distance
+and angle are the ones the first browser build of this game used: same lens, same seat, so
+the jumper stands where that build taught you to expect her.
 
 Everything else follows from those two decisions:
 
