@@ -25,6 +25,8 @@ One button does everything: space / up / W / click / tap.
 | M       | mute                                                     |
 
 A run ends when a rope reaches the bottom of its sweep while a foot is still on the dirt.
+With more than one rope a trip costs a rope instead of the run: the sweep restarts at
+the top and she stumble-hops back in, so the last rope is the one that ends it.
 
 ### Phones
 

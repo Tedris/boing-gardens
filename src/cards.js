@@ -10,7 +10,7 @@ export const CARDS = [
   },
   {
     id: 'rope', icon: '\u{1FAA2}', name: 'Another Rope', tier: 2,
-    blurb: 'One more rope, offset from the others. More skips per sweep.',
+    blurb: 'One more rope, offset from the others. More skips per sweep; a trip costs one.',
     max: 5,
     apply: (u) => { u.ropes = Math.min(6, u.ropes + 1); },
     level: (n) => `${n + 1} ROPES`,

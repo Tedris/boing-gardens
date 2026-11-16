@@ -122,6 +122,7 @@ export function createGame(stage) {
     y = 0; vy = 0; grounded = true; holdT = 0; holding = false;
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
+    stumbled = false; hintT = 0; lostHint = false;
     ropes.setCount(1);
     ropes.reset();
     renderOwned();
@@ -132,6 +133,8 @@ export function createGame(stage) {
   let airLeft = 0, thrusting = false, dead = false, deadT = 0;
   let shake = 0, flash = 0, nearMiss = 0, lastSkipT = -9;
   let pressEdge = false, down = false;
+  let stumbled = false;        // a trip costs at most one rope per frame
+  let hintT = 0, lostHint = false;   // the "ropes left" hint times itself out
   let camY = 0.88, camZ = 7.8, time = 0, ropeBottom = 0.014, camDip = 0;
   const sDip = springState();
   const hands = [V3(), V3()];
@@ -210,8 +213,31 @@ export function createGame(stage) {
     hint(touchUI ? 'tap to start the rope' : 'press to start the rope');
   }
 
+  const STUMBLE_VY = JUMP_V * 0.75;   // lands a beat before the sweep comes round
+
+  /** A trip with more than one rope in hand costs a rope, not the run. The sweep
+      restarts at the top so the next jump is a fair one, she takes a stumble hop
+      instead of falling, and the last rope is the one that ends it - which makes
+      rope count the only cushion in the game, and Another Rope the way to buy it. */
+  function loseRope() {
+    u.ropes--;
+    ropes.setCount(u.ropes);
+    ropes.reset();
+    vy = STUMBLE_VY; grounded = false; holdT = 0; thrusting = false;
+    shake = 0.8; flash = 0.35;
+    char.bump(-1.4, 0.5);
+    // not sfx.fail(): that is the death sound, and this run is still going
+    sfx.whoosh(); sfx.land(9);
+    hint(u.ropes === 1 ? 'last rope' : `${u.ropes} ropes left`);
+    hintT = 1.6; lostHint = true;
+  }
+
   function trip() {
-    if (dead) return;
+    // stumbled: a cluster of ropes can cross in the same frame, and one missed
+    // jump has to cost one rope, not the whole bundle
+    if (dead || stumbled) return;
+    stumbled = true;
+    if (u.ropes > 1) { loseRope(); return; }
     dead = true;
     deadT = 0;
     state = 'over';
@@ -311,6 +337,11 @@ export function createGame(stage) {
 
   function step(dt) {
     time += dt;
+    stumbled = false;
+    if (hintT > 0) {
+      hintT -= dt;
+      if (hintT <= 0) { hintT = 0; if (lostHint) { hint(''); lostHint = false } }
+    }
     const live = state === 'run' || state === 'ready' || state === 'over';
 
     if (state === 'ready') {
