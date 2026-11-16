@@ -21,10 +21,26 @@ One button does everything: space / up / W / click / tap.
 | Press   | leave the ground                                         |
 | Hold    | stay up longer on the way up; burn rocket fuel in the air |
 | Release | let the arc fall                                         |
-| 1 / 2 / 3 | pick a card during a level-up                          |
+| 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |
 | M       | mute                                                     |
 
 A run ends when a rope reaches the bottom of its sweep while a foot is still on the dirt.
+
+### Phones
+
+Touch mode is decided at load from three signals, because each one lies on its
+own: a coarse pointer (the honest one), a touch capability, a mobile browser's
+UA. `main.js` also flips it the first time a real finger lands, so a machine
+with both keeps the keyboard copy until it is touched. `game.js` writes
+`[data-touch]` on the root and `index.html` keys its copy off that, so the same
+page says TAP ANYWHERE and TAP A CARD instead of PRESS SPACE and PRESS 1 / 2 / 3.
+
+The pointer listener lives on the *window*, not on `#stage`: the title and draft
+overlays cover the canvas, so a tap on them never reached the stage and the game
+could not be started by touch at all. `#mute` and `.card` are excluded by target,
+or muting would also be a jump. Layout follows `(pointer: coarse), (max-width:
+720px)` for stacked cards and `(max-height: 520px)` for landscape, with
+`env(safe-area-inset-*)` on every edge element under `viewport-fit=cover`.
 
 ## How the look is made
 

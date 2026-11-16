@@ -91,6 +91,25 @@ export function createGame(stage) {
     flash: document.getElementById('flash'),
   };
 
+  // ---------------- input mode ----------------
+  // A phone has no keyboard, so the one button becomes a tap and the copy has to
+  // say so. A coarse pointer is the honest question to ask; main.js flips the
+  // answer on the first real touch, for machines that own both kinds of input.
+  // three signals, because each lies on its own: a coarse pointer (the honest
+  // one), a touch-capable device, and a mobile browser's own UA.
+  const MOBILE_UA = /Android|iPhone|iPad|iPod|KaiOS|Silk|Mobile Safari|Mobile\//i;
+  let touchUI = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints || 0) > 0
+    || MOBILE_UA.test(navigator.userAgent);
+  document.documentElement.dataset.touch = touchUI ? '1' : '0';
+  const goText = () => (touchUI ? 'TAP ANYWHERE' : 'PRESS SPACE');
+  const goAgainText = () => (touchUI ? 'TAP TO GO AGAIN' : 'PRESS SPACE TO GO AGAIN');
+  function setTouchUI(on) {
+    if (typeof on !== 'boolean' || on === touchUI) return;
+    touchUI = on;
+    document.documentElement.dataset.touch = on ? '1' : '0';
+    el.go.textContent = state === 'over' ? goAgainText() : goText();
+  }
+
   // ---------------- run state ----------------
   const u = {};
   function freshRun() {
@@ -176,7 +195,7 @@ export function createGame(stage) {
     char.group.position.set(0, 0, 0);
     el.title.innerHTML = 'BOING<span>GARDENS</span>';
     el.tag.textContent = 'One button. One rope. Endless altitude.';
-    el.go.textContent = 'PRESS SPACE';
+    el.go.textContent = goText();
     el.stats.style.display = 'none';
     camY = 0.9;
   }
@@ -189,7 +208,7 @@ export function createGame(stage) {
     resetScreen();
     el.screen.classList.add('off');
     state = 'ready';
-    hint('press to start the rope');
+    hint(touchUI ? 'tap to start the rope' : 'press to start the rope');
   }
 
   function trip() {
@@ -206,7 +225,7 @@ export function createGame(stage) {
     localStorage.setItem(BEST_KEY, String(best));
     el.title.innerHTML = 'WIPE<span>OUT</span>';
     el.tag.textContent = `The rope won that one. ${u.score} points.`;
-    el.go.textContent = 'PRESS SPACE TO GO AGAIN';
+    el.go.textContent = goAgainText();
     el.sSkips.textContent = u.skips;
     el.sAlt.textContent = `${Math.floor(u.altMax)}m`;
     el.sBest.textContent = best;
@@ -479,7 +498,7 @@ export function createGame(stage) {
   }
 
   return {
-    renderer, scene, camera, step, resize, press, release, pick,
+    renderer, scene, camera, step, resize, press, release, pick, setTouchUI,
     get state() { return state; },
     get rig() { return char.rig; },
     get debug() {

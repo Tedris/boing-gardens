@@ -29,12 +29,19 @@ addEventListener('keyup', (e) => {
   if (PRESS.has(e.code)) { pressed = false; game.release(); }
 });
 
+// One button, two hands: a key on a desk, a tap anywhere on a phone. These live
+// on the window because #screen and #draft cover the canvas, so a tap on the
+// title or on the backdrop never reached #stage - with the listener on the
+// stage, a touch-only machine could not start a run at all.
+const isControl = (t) => !!(t && t.closest && t.closest('#mute, .card'));
 const down = (e) => {
-  if (e.button !== undefined && e.button !== 0) return;
+  if (e.pointerType === 'touch') game.setTouchUI(true);
+  if (e.button !== undefined && e.button > 0) return;
+  if (isControl(e.target)) return;
   game.press();
 };
 const up = () => game.release();
-stage.addEventListener('pointerdown', down);
+addEventListener('pointerdown', down);
 addEventListener('pointerup', up);
 addEventListener('pointercancel', up);
 addEventListener('blur', () => { pressed = false; game.release(); });
