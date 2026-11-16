@@ -79,14 +79,14 @@ export function createCharacter() {
     const thigh = new THREE.Group();
     thigh.position.set(sx * P.hipX, -0.02, 0);
     hips.add(thigh);
-    const thighM = part(box(0.13, 0.24, 0.14), C.skin);
+    const thighM = part(box(0.13, 0.24, 0.14), C.limb, { key: 'limb' });
     thighM.position.y = -0.12;
     thigh.add(thighM);
 
     const knee = new THREE.Group();
     knee.position.y = P.knee;
     thigh.add(knee);
-    const shinM = part(box(0.115, 0.21, 0.125), C.skin);
+    const shinM = part(box(0.115, 0.21, 0.125), C.limb, { key: 'limb' });
     shinM.position.y = -0.105;
     knee.add(shinM);
     const sockM = part(box(0.125, 0.075, 0.135), C.sock);
@@ -158,14 +158,14 @@ export function createCharacter() {
     torso.add(shoulder);
     const cap = part(box(0.135, 0.115, 0.135), C.top);
     shoulder.add(cap);
-    const upper = part(box(0.105, 0.18, 0.105), C.skin);
+    const upper = part(box(0.105, 0.18, 0.105), C.limb, { key: 'limb' });
     upper.position.y = -0.09;
     shoulder.add(upper);
 
     const elbow = new THREE.Group();
     elbow.position.y = -P.armUp;
     shoulder.add(elbow);
-    const fore = part(box(0.095, 0.16, 0.095), C.skin);
+    const fore = part(box(0.095, 0.16, 0.095), C.limb, { key: 'limb' });
     fore.position.y = -0.08;
     elbow.add(fore);
     const band = part(box(0.105, 0.045, 0.105), C.shoe);
@@ -175,7 +175,7 @@ export function createCharacter() {
     const wrist = new THREE.Group();
     wrist.position.y = -P.armFore;
     elbow.add(wrist);
-    const hand = part(box(0.105, 0.10, 0.09), C.skin);
+    const hand = part(box(0.105, 0.10, 0.09), C.limb, { key: 'limb' });
     wrist.add(hand);
     // the handle the rope hangs from
     const grip = part(box(0.045, 0.05, 0.14), C.prop);
@@ -209,27 +209,32 @@ export function createCharacter() {
   // a bob at this size; a sculpted shell reads as a helmet. Nothing sits deeper behind
   // her than the skull: at a three-quarter angle back-overhang draws as a black fin off
   // the silhouette, which dead-on was hidden behind the head.
+  // The bob, in one group: a character who has no hair switches the whole of it off
+  // at once rather than hiding five boxes and forgetting a sixth.
+  const hair = new THREE.Group();
+  head.add(hair);
+  rig.hair = hair;
   const crown = part(box(0.50, 0.13, 0.42), C.hair);
   crown.position.y = 0.40;
-  head.add(crown);
+  hair.add(crown);
   const bangs = part(box(0.47, 0.085, 0.085), C.hairLt);
   bangs.position.set(0, 0.30, 0.19);
-  head.add(bangs);
+  hair.add(bangs);
   const hairBack = part(box(0.50, 0.36, 0.13), C.hair);
   hairBack.position.set(0, 0.19, -0.135);
-  head.add(hairBack);
+  hair.add(hairBack);
   rig.hairBack = hairBack;
   const sides = [];
   for (const sx of [-1, 1]) {
     const s = part(box(0.09, 0.34, 0.36), C.hair);
     s.position.set(sx * 0.215, 0.175, -0.01);
-    head.add(s);
+    hair.add(s);
     sides.push(s);
   }
   const clip = part(box(0.075, 0.03, 0.035), C.fire);
   clip.position.set(0.16, 0.335, 0.16);
   clip.rotation.z = -0.4;
-  head.add(clip);
+  hair.add(clip);
 
   // bob strands: three roots, two segments each, so the tail has a lag of its
   // own instead of swinging as one rigid slab
@@ -237,7 +242,7 @@ export function createCharacter() {
   for (const [ax, az] of [[-0.16, -0.21], [0, -0.25], [0.16, -0.21]]) {
     const root = new THREE.Group();
     root.position.set(ax, 0.29, az);
-    head.add(root);
+    hair.add(root);
     const segs = [];
     let parent = root;
     for (let k = 0; k < 2; k++) {
@@ -253,6 +258,44 @@ export function createCharacter() {
     strands.push({ root, segs, pitch: springState(), roll: springState(), phase: ax * 9 });
   }
   rig.strands = strands;
+
+  // ---------------- the other look ----------------
+  // One row of the roster has no hair at all: she is the jumper from the first web
+  // build, and what made her silhouette was a flat cap and a three-block scarf that
+  // trailed a beat behind her head. Both live here and stay hidden until a look asks
+  // for them, so it is still one rig - setLook switches them with `hair`.
+  const peak = new THREE.Group();
+  peak.visible = false;
+  head.add(peak);
+  const peakTop = part(box(0.50, 0.115, 0.44), C.prop);
+  peakTop.position.y = 0.42;
+  peak.add(peakTop);
+  const peakBrim = part(box(0.44, 0.045, 0.19), C.prop);
+  peakBrim.position.set(0, 0.375, 0.28);
+  peak.add(peakBrim);
+  rig.peak = peak;
+
+  // The scarf is parented end to end like the bob strands, so its tip lags the neck
+  // instead of swinging with the head. It trails back *and out*: hanging straight down
+  // the spine, or straight back, kept the whole thing inside her own torso silhouette at
+  // this camera angle, which leaves a jumper with no bob and no hair with no silhouette
+  // at all. Fanned out, the tip breaks the outline and the lag has somewhere to show.
+  const scarf = { root: new THREE.Group(), segs: [], pitch: springState(), roll: springState() };
+  scarf.root.position.set(0.07, 0.24, -0.16);
+  scarf.root.visible = false;
+  head.add(scarf.root);
+  let scarfParent = scarf.root;
+  for (let k = 0; k < 3; k++) {
+    const g = new THREE.Group();
+    g.position.set(k ? 0.06 : 0, k ? -0.05 : -0.03, k ? -0.085 : -0.02);
+    const m = part(box(0.22 - k * 0.05, 0.09, 0.05), C.top);
+    m.position.y = -0.05;
+    g.add(m);
+    scarfParent.add(g);
+    scarf.segs.push(g);
+    scarfParent = g;
+  }
+  rig.scarf = scarf.root;
 
   // ---------------- face ----------------
   const eyes = [];
@@ -474,6 +517,24 @@ export function createCharacter() {
       });
     });
 
+    // ---- scarf: the hair's spring on a single chain, so the tip arrives a beat after
+    // the head rather than with it, which is the whole trick behind her silhouette ----
+    if (scarf.root.visible) {
+      scarf.pitch.v += ((-lean * 0.7 - hang * 0.4) - scarf.pitch.p) * J.hair.k * dt;
+      scarf.pitch.v -= scarf.pitch.v * J.hair.d * dt;
+      scarf.pitch.p = clamp(scarf.pitch.p + scarf.pitch.v * dt, -J.hair.max * 1.5, J.hair.max * 1.5);
+      scarf.roll.v += ((-body.rotation.z * 1.4 + Math.sin(t * 2.1) * 0.04) - scarf.roll.p) * 60 * dt;
+      scarf.roll.v -= scarf.roll.v * 8.5 * dt;
+      scarf.roll.p += scarf.roll.v * dt;
+      // a fixed outward yaw plus a slow wobble: square to the spine the fan closes up
+      // and reads as one box again
+      scarf.root.rotation.set(scarf.pitch.p * look.jig, 0.22 + Math.sin(t * 2.1) * 0.05, scarf.roll.p);
+      scarf.segs.forEach((g, k) => {
+        g.rotation.x = scarf.pitch.p * (0.45 + k * 0.3) * look.jig;
+        g.rotation.y = Math.sin(t * 2.7 + k * 1.1) * 0.07;
+      });
+    }
+
     // ---- dust ----
     for (const p of puffs) {
       if (p.life <= 0) continue;
@@ -519,15 +580,21 @@ export function createCharacter() {
 
   /** Re-skin and re-proportion without rebuilding anything: colours are remapped
    *  by the value each mesh was built with, which is exact, and the shape is
-   *  three scalars update() already multiplies. */
+   *  three scalars update() already multiplies. `hair: false` picks the other
+   *  silhouette: the bob off, the cap and scarf on. */
   function setLook(l = {}) {
-    look = { w: 1, h: 1, squash: 1, jig: 1, ...l };
+    look = { w: 1, h: 1, squash: 1, jig: 1, hair: true, ...l };
     const tint = l.tint || {};
     group.traverse((o) => {
       if (!o.isMesh || o.userData.col === undefined) return;
-      const to = tint[o.userData.col];
+      // A named part wins only when the row actually names it; otherwise it takes the
+      // colour its palette value maps to, which is how every row worked before keys.
+      const k = o.userData.key;
+      const to = k !== undefined && tint[k] !== undefined ? tint[k] : tint[o.userData.col];
       o.material.color.setHex(to === undefined ? o.userData.col : to);
     });
+    hair.visible = look.hair;
+    peak.visible = scarf.root.visible = !look.hair;
   }
 
   return {

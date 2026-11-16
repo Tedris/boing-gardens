@@ -15,7 +15,9 @@ const JUMP_V = 3.8;          // a tap: ~0.31m apex, ~0.32s off the ground - over
 const HOLD_LIFT = 13.2;      // extra upward accel while holding, which is what turns that tap
                              // into the ~0.70m hop a single press used to give on its own
 const HOLD_MAX = 0.40;       // seconds of hold assist: the held apex arrives as it runs out
-const CHAR_KEY = 'boing-gardens-char';
+// Bumped when Muffler became the roster's first row: the first row is the default,
+// and a pick saved by the four-jumper roster would otherwise pin the old one for good.
+const CHAR_KEY = 'boing-gardens-char-2';
 const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
 const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
 const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop

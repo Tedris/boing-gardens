@@ -22,7 +22,7 @@ One button does everything: space / up / W / click / tap.
 | Hold    | stay up longer on the way up; burn rocket fuel in the air |
 | Release | let the arc fall                                         |
 | 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |
-| 1 – 4     | pick a jumper on the roster panel (on touch, tap the card)   |
+| 1 – 5     | pick a jumper on the roster panel (on touch, tap the card)   |
 | M       | mute                                                     |
 | P / Esc | pause, or resume                                           |
 | C       | swap jumper, but only while nothing is in motion             |
@@ -32,7 +32,7 @@ With more than one rope a trip costs a rope instead of the run: the sweep restar
 the top and she stumble-hops back in, so the last rope is the one that ends it.
 
 The title opens the roster before it lets a run start, because the jumper is the first
-decision and there is no reason to hide it behind a menu: four of them, one rig. `C` or
+decision and there is no reason to hide it behind a menu: five of them, one rig. `C` or
 the swap button steps through the list without opening the panel, and both are refused
 while a run is live — swapping legs mid-run would be a different run, not a shortcut.
 Picking re-seeds the run numbers where it happens (`pickChar`), since numbers that only
@@ -99,11 +99,12 @@ There are no animation clips. Every pose is solved per frame from gameplay state
 is what keeps it readable at any rope count or height:
 
 - `character.js` - rig built from boxes, then driven: damped springs for squash, stretch,
-  lean, nod and the bob; a two-bone IK (`reach`) aims the hands at the anchors the rope
+  lean, nod, the bob and the scarf; a two-bone IK (`reach`) aims the hands at the anchors the rope
   hangs from, so the arm pose is a *consequence* of the rope instead of a keyframed guess
   that has to match it.
-- `roster.js` — the four jumpers as a table, not four engines: `look` is a palette remap
-  plus shape scalars handed to `character.js:setLook`, and `apply` patches a fresh run's
+- `roster.js` — the five jumpers as a table, not five engines: `look` is a palette remap
+  plus shape scalars handed to `character.js:setLook` (plus `hair: false`, which puts Muffler
+  in a cap and a scarf where everyone else has a bob), and `apply` patches a fresh run's
   numbers in the same style as a card, so a character is a starting build that cards still
   stack on top of. The blurb is the spec — if she falls like a rumour, `fallDrag` says so.
 - `rope.js` — each rope is a real arc rotating around the hand axis, beaded so the sweep is
@@ -139,8 +140,8 @@ is what keeps it readable at any rope count or height:
   already marked dead.
 - `audio.js` — synthesised: envelopes on oscillators plus filtered noise. No files.
 
-The only soft parts left are the bob strands and one body spring (`character.js:J`): blocks
-do not jiggle, so the acting is silhouette - squash, tuck, lean, hair.
+The only soft parts left are the bob strands, one scarf and one body spring
+(`character.js:J`): blocks do not jiggle, so the acting is silhouette - squash, tuck, lean, hair.
 
 ## Loop
 
@@ -158,8 +159,10 @@ her. Nothing you earn carries between runs.
 ## Staying clear of anyone's IP
 
 - Name, character design, palette, UI copy and card names are original. She has a teal bob
-  and a hair clip, not anyone else's silhouette, and the other three jumpers are that one
-  rig recoloured and re-tuned rather than four borrowed designs. Everyone in here is a
+  and a hair clip, not anyone else's silhouette, and the other four jumpers are that one
+  rig recoloured and re-tuned rather than five borrowed designs — Muffler's cap and scarf
+  included, since that silhouette comes from this project's own earlier browser build.
+  Everyone in here is a
   rectangle, which settles the suggestive-content question at the source.
 - Geometry, the face, the palette and audio are generated in this repo. No imported model,
   texture, audio or font file exists here; `vendor/three.module.js` is MIT three.js.
@@ -186,13 +189,13 @@ her. Nothing you earn carries between runs.
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |
-| `roster.js` | `ROSTER` | the four jumpers: look, blurb and starting numbers |
+| `roster.js` | `ROSTER` | the five jumpers: look, blurb and starting numbers |
 
 ## Checks
 
 No build step and no test suite; behaviour was verified in a browser at 1024x707: title →
 roster → pick by key → run → level-up draft → card pick by key → trip → game over → restart,
-four jumpers, three ropes with fire, and 700 m frames driven through
+five jumpers, three ropes with fire, and 700 m frames driven through
 `window.game.script.fly()`. Framing was measured the same way, as her feet against the frame
 centre: eight plain hops with no cards moved the frame 1 cm in total, and a six-metre jump, a
 rocket climb and a 350 m fall each kept her inside the band the camera is parked for (-2.7 to

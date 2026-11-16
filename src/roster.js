@@ -1,11 +1,13 @@
-// The roster: one rig, four ways to misbehave.
+// The roster: one rig, five ways to misbehave.
 //
-// A character is a table row, not a second animator. `look` is a palette remap
-// plus a few shape scalars applied to the existing rig (see character.js
-// setLook); `apply` patches the fresh run's numbers in the same style as the
-// upgrade cards, so cards still stack on top of a character mid-run. The blurb is
-// the joke and the numbers have to keep it true: if a character says she falls
-// like a rumour, fallDrag has to say so too.
+// A character is a table row, not a second animator. `look` is a palette remap plus a
+// few shape scalars applied to the existing rig (see character.js setLook), with
+// `hair: false` for the one jumper who wears a cap and a scarf where everyone else has
+// a bob. A tint entry is keyed by palette value, or by the part name the rig offers
+// (`limb`) when two palette entries have to part ways. `apply` patches the fresh run's
+// numbers in the same style as the upgrade cards, so cards still stack on top of a
+// character mid-run. The blurb is the joke and the numbers have to keep it true: if a
+// character says she falls like a rumour, fallDrag has to say so too.
 //
 // What each knob does in game.js: jumpV takeoff speed, fallDrag gravity while
 // falling (as a multiplier), ropeSpeed sweep rate, holdLift/holdMax how hard and
@@ -15,6 +17,33 @@
 import { C } from './toon.js';
 
 export const ROSTER = [
+  {
+    id: 'muffler',
+    icon: '\u{1F9E3}',
+    name: 'Muffler',
+    blurb: 'From the first build: a slow rope, no hair, and a button you hold to charge.',
+    look: {
+      // The old build's palette kept: rose head and body, its dark for the cap and the
+      // shoes, and its own dusty green on the arms and legs alone. `limb` is a part name
+      // rather than a palette value, which is how the face stays rose when the arms do
+      // not. No bob: the rig gives her the cap and the scarf instead (setLook).
+      hair: false,
+      tint: {
+        limb: 0x3a4a42,          // by part name: arms and legs only, not the face
+        [C.skin]: 0xc94f6d, [C.skinDk]: 0xa8455f, [C.blush]: 0x8e3f56,
+        [C.hair]: 0x1d2630, [C.hairLt]: 0x2a3540,
+        [C.shorts]: 0xb04460, [C.shortsDk]: 0x8e3f56,
+        [C.shoe]: 0x1d2630, [C.shoeSo]: 0x141a22, [C.sock]: 0x2f3d46,
+      },
+      squash: 1.6, jig: 1.1,
+    },
+    apply: (u) => {
+      u.ropeSpeed *= 0.77;    // 1.3s a turn: the old period, kept on purpose
+      u.holdLift *= 1.14;     // the charge is her whole kit: hold and she is gone
+      u.holdMax = 0.5;        // for the old half second of holding, no longer
+      u.airJumps += 1;        // the old air jump, for the landings that were not
+    },
+  },
   {
     id: 'boing',
     icon: '\u{1F998}',

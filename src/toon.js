@@ -25,6 +25,8 @@ export const C = {
   prop:    0x161d28,   // props and silhouettes, one step up from a hole
   skin:    0xd9a878,
   skinDk:  0xb08358,
+  limb:    0xd9a878,   // arms and legs, the same value as skin by default. The rig keys these
+                       // meshes, so a character can part them from her face: see roster.js.
   hair:    0x1f5a66,   // teal bob, kept: it is the one thing that is unmistakably hers
   hairLt:  0x2c7280,
   top:     0xc94f6d,   // rose: the figure has to pop against a slate stage
@@ -79,10 +81,17 @@ const snapPatch = (shader) => {
  */
 const matCache = new Map();
 export function mat(color, o = {}) {
+  // `unique` skips the cache: a part roster.js addresses by key has to own its
+  // material, or recolouring her arms would recolour her face too, same colour.
   const key = `${color}|${o.snap === false ? 0 : 1}|${o.fog === false ? 0 : 1}`;
-  let m = matCache.get(key);
-  if (m) return m;
-  m = new THREE.MeshLambertMaterial({
+  if (o.unique) return newMaterial(color, o);
+  const hit = matCache.get(key);
+  if (hit) return hit;
+  return newMaterial(color, o, key);
+}
+
+function newMaterial(color, o, cacheKey) {
+  const m = new THREE.MeshLambertMaterial({
     color,
     flatShading: true,
     fog: o.fog !== false,
@@ -94,7 +103,7 @@ export function mat(color, o = {}) {
     m.onBeforeCompile = snapPatch;
     m.customProgramCacheKey = () => 'ps1-snap';   // keeps snapped/unsnapped variants apart
   }
-  matCache.set(key, m);
+  if (cacheKey !== undefined) matCache.set(cacheKey, m);
   return m;
 }
 
@@ -102,12 +111,16 @@ export function mat(color, o = {}) {
  *  (the rope, anything that should ignore the stage's single lamp). Nothing casts
  *  or receives a shadow: one light, no shadow maps, the ground blob is a disc. */
 export function part(geo, color, o = {}) {
+  // A `key` makes the part addressable by name in a roster tint, which matters when
+  // two palette entries share a value: Muffler's arms are the same colour as her face
+  // until she is picked, and then they are not.
   const m = o.basic
     ? new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
       color, fog: o.fog !== false, transparent: !!o.transparent, opacity: o.opacity ?? 1,
     }))
-    : new THREE.Mesh(geo, mat(color, o));
-  m.userData.col = color;      // the roster recolours by base palette value
+    : new THREE.Mesh(geo, mat(color, o.key ? { ...o, unique: true } : o));
+  m.userData.col = color;      // the roster recolours by base palette value...
+  if (o.key) m.userData.key = o.key;   // ...or by the name the rig gave the part
   return m;
 }
 
