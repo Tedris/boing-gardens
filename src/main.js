@@ -113,7 +113,7 @@ function frame(now) {
   last = now;
   game.step(dt);
   paintPause();          // the panel can also be lifted by a tap anywhere
-  game.renderer.render(game.scene, game.camera);
+  game.render();          // the pixel buffer and the one post pass, in game.js
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

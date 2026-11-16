@@ -1,310 +1,167 @@
-// Park at ground level, sky that gives way to space as you climb.
-// Everything scenery is placed behind the jumper: the camera looks straight
-// down -Z, so anything at positive z would sit between it and her.
+// A PS1 stage, not a park: one dark floor, a horizon silhouette that swaps as
+// she climbs, flat cloud shelves recycled past the camera, and boxes for stars
+// once the air thins. Everything scenery is behind the jumper: the camera looks
+// straight down -Z, so anything at positive z would sit between it and her.
 import * as THREE from '../vendor/three.module.js';
-import { C, toon, canvasTex } from './toon.js';
+import { C, mat, part } from './toon.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
+
+// Altitude bands, in metres of camera height. Tier i is what shows between
+// BANDS[i-1] and BANDS[i]: the stage, the rooftops, the cloud deck, thin air.
+// The boundaries are set against game.js's `space` ramp (60..260 m) so the
+// skyline goes over exactly when the light does.
+const BANDS = [12, 60, 150];
+const CLOUD_TOP = BANDS[2];        // stars only make sense above the cloud deck
+
+// Horizon silhouettes, one tier per band: slabs { x, w, h } at z = -8, depth
+// 1.4, each clear of the jumper's lane (|x| - w/2 >= 6) so nothing ever reads
+// as an obstacle. Built once; update() only flips .visible.
+const TIERS = [
+  [ // the stage: two low blocks and one stacked-box tree, all but empty
+    { x: -13.5, w: 3.0, h: 1.6 }, { x: 9.5, w: 2.2, h: 1.1 }, { x: 14.0, w: 3.4, h: 2.2 },
+    { x: -8.6, w: 0.5, h: 0.8, y: 0.4 }, { x: -8.6, w: 1.6, h: 0.9, y: 1.25 },
+  ],
+  [ // rooftops: a denser, taller skyline
+    { x: -15.0, w: 2.6, h: 3.6 }, { x: -11.0, w: 1.8, h: 5.0 }, { x: -7.6, w: 1.4, h: 2.6 },
+    { x: 7.8, w: 1.6, h: 4.2 }, { x: 11.0, w: 2.4, h: 5.8 }, { x: 14.8, w: 1.8, h: 3.2 },
+  ],
+  [ // the cloud deck: three wide, low hangars
+    { x: -11.0, w: 4.6, h: 1.4 }, { x: 9.0, w: 4.0, h: 1.8 }, { x: 14.0, w: 2.0, h: 2.6 },
+  ],
+  [ // thin air: sparse spires
+    { x: -12.5, w: 1.4, h: 5.6 }, { x: 10.5, w: 1.2, h: 4.2 }, { x: 15.5, w: 2.4, h: 1.2 },
+  ],
+];
 
 export function createWorld() {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
 
-  // ---------- sky dome ----------
-  const skyUniforms = {
-    uLow: { value: new THREE.Color(0xd8f0ff) },
-    uHigh: { value: new THREE.Color(0x51b4f5) },
-    uSpace: { value: 0 },
-  };
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(420, 24, 16),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      uniforms: skyUniforms,
-      vertexShader: `
-        varying vec3 vDir;
-        void main(){
-          vDir = normalize(position);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-        }`,
-      fragmentShader: `
-        uniform vec3 uLow; uniform vec3 uHigh; uniform float uSpace;
-        varying vec3 vDir;
-        void main(){
-          float t = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
-          vec3 air = mix(uLow, uHigh, pow(t, 0.7));
-          vec3 void_ = mix(vec3(0.035,0.045,0.11), vec3(0.004,0.006,0.03), pow(t,0.6));
-          gl_FragColor = vec4(mix(air, void_, uSpace), 1.0);
-        }`,
-    }),
-  );
-  sky.renderOrder = -10;
-  group.add(sky);
+  // One unit box for every box in the module - slabs, clouds, stars, rims -
+  // scaled per mesh, so the whole stage is two geometries and a cached material
+  // per colour. The ground is one quad on purpose: a dense floor grid would make
+  // the vertex snap crawl in a hundred places at once.
+  const box = new THREE.BoxGeometry(1, 1, 1);
 
-  // sun disc, parked far behind the park
-  const sunTex = canvasTex(128, 128, (g, w) => {
-    const r = g.createRadialGradient(w / 2, w / 2, 2, w / 2, w / 2, w / 2);
-    r.addColorStop(0, 'rgba(255,252,225,1)');
-    r.addColorStop(0.35, 'rgba(255,236,170,0.8)');
-    r.addColorStop(1, 'rgba(255,220,140,0)');
-    g.fillStyle = r;
-    g.fillRect(0, 0, w, w);
-  });
-  const sunMat = new THREE.MeshBasicMaterial({ map: sunTex, transparent: true, depthWrite: false, toneMapped: false });
-  const sun = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), sunMat);
-  sun.position.set(-150, 150, -360);
-  group.add(sun);
+  // ---------- floor ----------
+  const floor = part(new THREE.PlaneGeometry(200, 200), C.floor);
+  floor.rotation.x = -Math.PI / 2;
+  group.add(floor);
 
-  // ---------- ground ----------
-  const grass = new THREE.Mesh(new THREE.CircleGeometry(60, 48), toon(C.grass, { steps: 2 }));
-  grass.rotation.x = -Math.PI / 2;
-  grass.receiveShadow = true;
-  group.add(grass);
+  // two marks on the floor, both flush: a worn patch darker than the ground around
+  // it, and a stone strip off to one side. Raise either by a centimetre and it
+  // stops being a mark and becomes a slab lying on the stage.
+  const pad = part(box, C.grassDk);
+  pad.scale.set(2.8, 0.02, 2.8);
+  pad.position.set(0, -0.009, -0.4);
+  const strip = part(box, C.stone);
+  strip.scale.set(5.5, 0.02, 0.6);
+  strip.position.set(7.5, -0.0095, -4.5);
+  group.add(pad, strip);
 
-  const meadow = new THREE.Mesh(new THREE.RingGeometry(60, 200, 40), toon(C.grassDk, { steps: 2 }));
-  meadow.rotation.x = -Math.PI / 2;
-  meadow.position.y = -0.01;
-  meadow.receiveShadow = true;
-  group.add(meadow);
+  // ---------- horizon: one tier visible at a time, riding her eye line ----------
+  // The group tracks camY, so a tier always sits on the horizon instead of
+  // sinking out of frame behind the fog as she climbs.
+  const horizon = new THREE.Group();
+  group.add(horizon);
 
-  // the worn dirt circle the jumper owns
-  const dirt = new THREE.Mesh(new THREE.CircleGeometry(2.4, 32), toon(C.dirt, { steps: 2 }));
-  dirt.rotation.x = -Math.PI / 2;
-  dirt.position.y = 0.005;
-  dirt.receiveShadow = true;
-  group.add(dirt);
-
-  // ---------- trees: a band behind her, plus a few far off to the sides ----------
-  const spots = [];
-  for (let i = 0; i < 22; i++) {
-    const a = Math.PI + (i / 22) * Math.PI + rand(-0.08, 0.08);
-    const r = rand(13, 46);
-    spots.push({ x: Math.cos(a) * r * 1.7, z: Math.sin(a) * r * 0.55 - 7, s: rand(0.68, 1.0) });
-  }
-  for (let i = 0; i < 6; i++) {
-    // side trees only where they fall outside the frame at this fov
-    const sx = i % 2 ? 1 : -1;
-    spots.push({ x: sx * rand(7.5, 16), z: rand(-8, 2), s: rand(0.7, 0.95) });
-  }
-  const n = spots.length;
-  const trunkGeo = new THREE.CylinderGeometry(0.2, 0.36, 3.6, 7);
-  const leafGeo = new THREE.IcosahedronGeometry(1.6, 0);
-  const hullScale = new THREE.Vector3(1.06, 1.06, 1.06);
-  const hull = new THREE.Matrix4();
-  const inkOf = () => new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide });
-  const trunks = new THREE.InstancedMesh(trunkGeo, toon(C.trunk, { steps: 2 }), n);
-  const trunksInk = new THREE.InstancedMesh(trunkGeo, inkOf(), n);
-  const leaves = new THREE.InstancedMesh(leafGeo, toon(C.leaf, { steps: 2, flat: true }), n * 3);
-  const leavesInk = new THREE.InstancedMesh(leafGeo, inkOf(), n * 3);
-  trunks.castShadow = leaves.castShadow = true;
-  let li = 0;
-  spots.forEach((p, i) => {
-    dummy.position.set(p.x, 1.8 * p.s, p.z);
-    dummy.rotation.set(0, rand(0, 3.14), rand(-0.03, 0.03));
-    dummy.scale.set(p.s, p.s, p.s);
-    dummy.updateMatrix();
-    trunks.setMatrixAt(i, dummy.matrix);
-    trunksInk.setMatrixAt(i, hull.copy(dummy.matrix).scale(hullScale));
-    for (let k = 0; k < 3; k++) {
-      dummy.position.set(
-        p.x + rand(-1.2, 1.2) * p.s,
-        (3.5 + k * 0.95 + rand(-0.2, 0.2)) * p.s,
-        p.z + rand(-1.1, 1.1) * p.s,
-      );
-      dummy.rotation.set(rand(0, 3), rand(0, 3), rand(0, 3));
-      const s = p.s * (1.15 - k * 0.2);
-      dummy.scale.set(s, s * 0.82, s);
-      dummy.updateMatrix();
-      leaves.setMatrixAt(li, dummy.matrix);
-      leavesInk.setMatrixAt(li, hull.copy(dummy.matrix).scale(hullScale));
-      li++;
-    }
-  });
-  group.add(trunks, trunksInk, leaves, leavesInk);
-
-  // ---------- flowers, none of them under the camera ----------
-  const petalGeo = new THREE.SphereGeometry(0.08, 6, 5);
-  const stemGeo = new THREE.CylinderGeometry(0.016, 0.02, 0.24, 4);
-  const NF = 240;
-  const petals = new THREE.InstancedMesh(petalGeo, toon(C.flower, { steps: 2 }), NF);
-  const stems = new THREE.InstancedMesh(stemGeo, toon(0x4f9c3c, { steps: 2 }), NF);
-  for (let i = 0; i < NF; i++) {
-    let x = 0, z = 0;
-    for (let tries = 0; tries < 8; tries++) {
-      const a = rand(0, 6.283), r = Math.sqrt(Math.random()) * 34;
-      x = Math.cos(a) * r;
-      z = Math.sin(a) * r;
-      if (z < 0.5 || Math.abs(x) > 3.4) break;
-    }
-    dummy.rotation.set(0, 0, 0);
-    dummy.position.set(x, 0.28, z);
-    dummy.scale.setScalar(rand(0.85, 1.4));
-    dummy.updateMatrix();
-    petals.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(x, 0.12, z);
-    dummy.scale.setScalar(1);
-    dummy.updateMatrix();
-    stems.setMatrixAt(i, dummy.matrix);
-  }
-  group.add(petals, stems);
-
-  // ---------- backdrop: one low building and a hedge line ----------
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(74, 13, 9), toon(C.brick, { steps: 2 }));
-  wall.position.set(6, 6.5, -74);
-  group.add(wall);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(76, 1.2, 10.5), toon(0x94482f, { steps: 2 }));
-  roof.position.set(6, 13.5, -74);
-  group.add(roof);
-  const winGeo = new THREE.BoxGeometry(1.1, 1.9, 0.3);
-  const wins = new THREE.InstancedMesh(winGeo, toon(0xaee2f0, { steps: 2 }), 16);
-  for (let i = 0; i < 16; i++) {
-    dummy.position.set(-19 + (i % 8) * 5.4, 5 + Math.floor(i / 8) * 4.4, -69.2);
-    dummy.rotation.set(0, 0, 0);
-    dummy.scale.setScalar(1);
-    dummy.updateMatrix();
-    wins.setMatrixAt(i, dummy.matrix);
-  }
-  group.add(wins);
-
-  const hedge = new THREE.Mesh(new THREE.BoxGeometry(72, 0.75, 0.9), toon(C.hedge, { steps: 2, flat: true }));
-  hedge.position.set(0, 0.37, -24);
-  group.add(hedge);
-
-  // ---------- clouds: a recycled band that follows the camera ----------
-  // three overlapping puffs each, or a recycled band of icosahedrons just looks
-  // like floating white cookies
-  const PUFFS = 3;
-  const NCLOUD = 46;
-  const NC = NCLOUD * PUFFS;
-  const SPAN = 230;
-  const OFF = [[-0.55, -0.12, -0.2], [0.5, 0.08, 0.25], [0.05, 0.3, -0.5]];
-  const cbase = new Float32Array(NCLOUD * 3);
-  const cscale = new Float32Array(NCLOUD);
-  const puffGeo = new THREE.IcosahedronGeometry(1, 0);
-  // slight self-light: an unlit underside would pick up green from the grass
-  const clouds = new THREE.InstancedMesh(puffGeo, toon(C.cloud, { steps: 2, flat: true, emissive: 0xdfe9ff, emissiveIntensity: 0.32 }), NC);
-  const cloudInk = new THREE.InstancedMesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0x5b7fa6, side: THREE.BackSide }), NC);
-  for (let c = 0; c < NCLOUD; c++) {
-    // stay inside the frustum corridor: spread wider or deeper than this and
-    // the band reads as empty blue, spread narrower and one lands on the lens
-    cbase[c * 3] = rand(-52, 52);
-    cbase[c * 3 + 1] = rand(6, SPAN);
-    cbase[c * 3 + 2] = rand(-96, -18);
-    cscale[c] = rand(1.5, 3.6);
-  }
-  group.add(clouds, cloudInk);
-
-  // ---------- stars ----------
-  const starPos = new Float32Array(800 * 3);
-  for (let i = 0; i < 800; i++) {
-    const a = rand(0, 6.283), b = Math.acos(rand(-1, 1)), r = 300;
-    starPos[i * 3] = Math.sin(b) * Math.cos(a) * r;
-    starPos[i * 3 + 1] = Math.abs(Math.cos(b)) * r * 0.9;
-    starPos[i * 3 + 2] = Math.sin(b) * Math.sin(a) * r;
-  }
-  const starGeo = new THREE.BufferGeometry();
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
-    color: C.star, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false,
+  const slabs = TIERS.map((row, t) => row.map((s) => {
+    const m = part(box, C.prop);
+    m.scale.set(s.w, s.h, 1.4);
+    m.position.set(s.x, s.y ?? s.h / 2, -8);
+    m.visible = t === 0;
+    horizon.add(m);
+    return m;
   }));
+
+  // ---------- clouds: flat shelves, recycled past the camera ----------
+  const NCLOUD = 16;
+  const SPAN = 120;                        // vertical wrap distance
+  const cbase = new Float32Array(NCLOUD * 3);
+  const csize = new Float32Array(NCLOUD * 3);
+  for (let i = 0; i < NCLOUD; i++) {
+    cbase[i * 3] = rand(-46, 46);
+    cbase[i * 3 + 1] = rand(-10, SPAN - 12);   // absolute y; wrapped past the camera
+    cbase[i * 3 + 2] = rand(-46, -16);         // never positive z
+    csize[i * 3] = rand(6, 15);
+    csize[i * 3 + 1] = rand(0.35, 0.8);
+    csize[i * 3 + 2] = rand(2.5, 6);
+  }
+  const clouds = new THREE.InstancedMesh(box, mat(C.cloud), NCLOUD);
+  // Instances recycle across a 120 m column, which outruns the bounding sphere
+  // three caches off the first frame's matrices - the stage is cheap, cull it off.
+  clouds.frustumCulled = false;
+  group.add(clouds);
+
+  // ---------- stars: fog-exempt boxes, parked on a shell that follows her ----------
+  const NSTAR = 300;
+  const starMat = new THREE.MeshBasicMaterial({
+    color: C.star, fog: false, transparent: true, opacity: 0, depthWrite: false,
+  });
+  const stars = new THREE.InstancedMesh(box, starMat, NSTAR);
+  for (let i = 0; i < NSTAR; i++) {
+    const a = rand(0, 6.283), b = Math.acos(rand(-1, 1)), r = 300;
+    const s = rand(0.9, 1.7);              // ~1 internal pixel at 300 m
+    dummy.position.set(Math.sin(b) * Math.cos(a) * r, Math.abs(Math.cos(b)) * r * 0.9, Math.sin(b) * Math.sin(a) * r);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(s, s, s);
+    dummy.updateMatrix();
+    stars.setMatrixAt(i, dummy.matrix);
+  }
+  stars.instanceMatrix.needsUpdate = true;
   group.add(stars);
 
-  // ---------- birds: they hop about behind her while she is on the grass ----------
-  const birds = new THREE.Group();
-  const flock = [];
-  const birdBody = new THREE.SphereGeometry(0.11, 8, 6);
-  for (let i = 0; i < 4; i++) {
-    const b = new THREE.Group();
-    const body = new THREE.Mesh(birdBody, toon(i % 2 ? 0x64768e : 0x8a6450, { steps: 2 }));
-    body.castShadow = true;
-    b.add(body);
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 7, 5), toon(0xe4edf6, { steps: 2 }));
-    belly.position.set(0, -0.035, 0.045);
-    b.add(belly);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.09, 5), toon(0xffb020, { steps: 2 }));
-    beak.rotation.x = Math.PI / 2;
-    beak.position.set(0, 0.01, 0.13);
-    b.add(beak);
-    for (const sx of [-1, 1]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), toon(0x1b1226, { steps: 1 }));
-      eye.position.set(sx * 0.06, 0.045, 0.088);
-      b.add(eye);
-    }
-    b.position.set(rand(-2.4, 2.4), 0.11, rand(-2.6, -0.4));
-    b.userData = { t: rand(0, 6), base: b.position.clone(), hop: rand(0, 6.28) };
-    flock.push(b);
-    birds.add(b);
-  }
-  group.add(birds);
+  const skyLow = new THREE.Color(C.sky);
+  const skyHigh = new THREE.Color(C.skyHi);
+  /** Fog/background colour, ground air to thin air; game.js feeds this to scene.fog. */
+  const skyColor = new THREE.Color(C.sky);
 
-  // fire ropes throw warm light onto the jumper
-  const fireLight = new THREE.PointLight(0xffa028, 0, 9, 2);
-  fireLight.position.set(0, 1, 1.1);
-  group.add(fireLight);
-
-  const skyCol = new THREE.Color();
+  let tier = 0;
 
   return {
     group,
-    fireLight,
-    /** camY = camera height; time = seconds; fire = fire-rope strength */
+    skyColor,
+    /** camY = camera height; time = seconds. `fire` is unused on purpose: a burning
+     *  rope shows on the rope and its embers, and the world itself never glows for it. */
     update(dt, time, camY, fire) {
-      sky.position.y = camY;
-      stars.position.y = camY;
-      skyUniforms.uSpace.value = THREE.MathUtils.smoothstep(camY - 1, 45, 280);
-      skyCol.setHSL(0.56, 0.85 - skyUniforms.uSpace.value * 0.5, 0.74 - skyUniforms.uSpace.value * 0.58);
-      skyUniforms.uHigh.value.copy(skyCol);
-      stars.material.opacity = Math.min(1, Math.max(0, (camY - 70) / 180));
-      sunMat.opacity = 1 - skyUniforms.uSpace.value * 0.8;
-      sun.visible = skyUniforms.uSpace.value < 0.99;
+      // sky: the same colour the fog dissolves the horizon into
+      skyColor.lerpColors(skyLow, skyHigh, THREE.MathUtils.smoothstep(camY, 40, 240));
 
-      for (let c = 0; c < NCLOUD; c++) {
-        let y = cbase[c * 3 + 1];
-        while (y < camY - 90) y += SPAN;
-        while (y > camY + 170) y -= SPAN;
-        cbase[c * 3 + 1] = y;
-        const s = cscale[c];
-        const drift = Math.sin(time * 0.06 + c) * 1.8;
-        for (let k = 0; k < PUFFS; k++) {
-          const i = c * PUFFS + k;
-          const sc = s * (k === 2 ? 0.72 : 1);
-          dummy.position.set(
-            cbase[c * 3] + OFF[k][0] * s + drift,
-            y + OFF[k][1] * s,
-            cbase[c * 3 + 2] + OFF[k][2] * s,
-          );
-          dummy.rotation.set(c * 0.7 + k * 1.9, c * 1.7, k * 1.3);
-          dummy.scale.set(sc, sc * 0.66, sc * 0.9);
-          dummy.updateMatrix();
-          clouds.setMatrixAt(i, dummy.matrix);
-          cloudInk.setMatrixAt(i, hull.copy(dummy.matrix).scale(hullScale));
+      // horizon: the tier for this band, sitting on her eye line
+      let t = 0;
+      while (t < BANDS.length && camY >= BANDS[t]) t++;
+      if (t !== tier) {
+        tier = t;
+        for (let i = 0; i < slabs.length; i++) {
+          for (const s of slabs[i]) s.visible = i === t;
         }
+      }
+      horizon.position.y = camY - 0.9;
+
+      // clouds: wrap the band around the camera so the deck is always around her
+      for (let i = 0; i < NCLOUD; i++) {
+        let y = cbase[i * 3 + 1];
+        while (y < camY - 12) y += SPAN;           // fell below her: recycle on top
+        while (y > camY + SPAN - 12) y -= SPAN;
+        cbase[i * 3 + 1] = y;
+        dummy.position.set(
+          cbase[i * 3] + Math.sin(time * 0.06 + i) * 1.8,
+          y,
+          cbase[i * 3 + 2],
+        );
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(csize[i * 3], csize[i * 3 + 1], csize[i * 3 + 2]);
+        dummy.updateMatrix();
+        clouds.setMatrixAt(i, dummy.matrix);
       }
       clouds.instanceMatrix.needsUpdate = true;
-      cloudInk.instanceMatrix.needsUpdate = true;
 
-      const near = camY < 9;
-      birds.visible = near;
-      if (near) {
-        for (const b of flock) {
-          const u = b.userData;
-          u.t += dt;
-          const hop = Math.abs(Math.sin(u.t * 2.2 + u.hop));
-          b.position.y = u.base.y + hop * 0.14;
-          b.position.x = u.base.x + Math.sin(u.t * 0.45 + u.hop) * 0.8;
-          b.rotation.y = Math.sin(u.t * 0.45 + u.hop) * 0.8;
-          b.rotation.x = -hop * 0.22;
-        }
-      }
+      // stars: they only exist once she is above the cloud deck
+      stars.position.y = camY;
+      starMat.opacity = THREE.MathUtils.smoothstep(camY, CLOUD_TOP, CLOUD_TOP + 70);
+      stars.visible = starMat.opacity > 0.001;
 
-      if (fire > 0) {
-        const f = 0.75 + Math.sin(time * 26) * 0.14 + Math.sin(time * 41.3) * 0.08;
-        fireLight.intensity = fire * 5.5 * f;
-        fireLight.position.set(0, 0.95 + Math.sin(time * 7) * 0.12, 1.15);
-      } else {
-        fireLight.intensity = 0;
-      }
     },
   };
 }

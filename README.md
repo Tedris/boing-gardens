@@ -69,19 +69,36 @@ phone that shows nothing and a phone that ignores input are the same report.
 
 ## How the look is made
 
-"3D that reads as 2D", the cheap way: a 22° camera on a dead-on axis with no rotation,
-a 2–3 step cel ramp (`toon.js:ramp`) so light changes in hard bands, and inverted-hull
-outlines on every silhouette (`toon.js:ink`). No post-processing, no render targets.
+A PS1-era software renderer, approximated in two passes. The scene is real 3D - boxes,
+flat-shaded Lambert facets, one directional light, one fog - rendered into a 240-row
+target and then upscaled by hand: sRGB encode, 4x4 Bayer dither, quantise to 31 levels
+(`toon.js:createPost`). The camera sits on a dead-on axis and never rotates, so the
+projection stays near-orthographic and a pose reads the way it was posed.
+
+Everything else follows from those two decisions:
+
+- vertices snap to a 2-pixel grid in the vertex shader (`toon.js:SNAP`), which is where
+  the wobble-as-you-move comes from, for free;
+- only a handful of real colours exist (`toon.js:C`), and the dither is trusted to make
+  the in-betweens instead of a gradient;
+- the fog's clear zone travels with the camera (`game.js`), so she is never inside the
+  haze that dissolves the world behind her - a fixed near edge fogs the subject at 8 m
+  and erases her above 300 m;
+- the rope, the embers and the stars are unlit and fog-exempt: the sweep has to stay the
+  brightest thing on screen.
+
+No textures, no shadow maps (the contact shadow is a disc), no imported assets. The canvas
+is `image-rendering: pixelated` so the browser cannot smooth the pass away.
 
 ## How the animation works
 
 There are no animation clips. Every pose is solved per frame from gameplay state, which
 is what keeps it readable at any rope count or height:
 
-- `character.js` — rig built from primitives, then driven: damped springs for squash and
-  stretch, lean, nod, hair strands, and soft-body bounce; a two-bone IK (`reach`) aims the
-  hands at the anchors the rope hangs from, so the arm pose is a *consequence* of the rope
-  instead of a keyframed guess that has to match it.
+- `character.js` - rig built from boxes, then driven: damped springs for squash, stretch,
+  lean, nod and the bob; a two-bone IK (`reach`) aims the hands at the anchors the rope
+  hangs from, so the arm pose is a *consequence* of the rope instead of a keyframed guess
+  that has to match it.
 - `roster.js` — the four jumpers as a table, not four engines: `look` is a palette remap
   plus shape scalars handed to `character.js:setLook`, and `apply` patches a fresh run's
   numbers in the same style as a card, so a character is a starting build that cards still
@@ -96,17 +113,18 @@ is what keeps it readable at any rope count or height:
   The rope hangs from her hands, and matrices only refresh at draw time, so `game.js`
   adds the height gained since the last frame before asking where they are - at 100 m/s
   that is a two-metre error otherwise.
-- `world.js` — park at ground level, a cloud band that recycles around the camera, sky
-  that fades to space, all altitude-driven.
+- `world.js` - a dark stage that reads as one: a dusty floor slab, skyline silhouettes that
+  swap as she climbs, a cloud band that recycles around the camera, sky that fades to space
+  with stars tiering in above it. All altitude-driven, and the sky colour it returns *is*
+  the fog colour, so the two can never disagree about what height this is.
 - `game.js` — one-button physics, the level-up draft, camera. Vertical camera tracking is
   near-rigid so a rocket climb can't walk her out of frame. Every run begins in
   `startRun()`, which clears stats *and* the dead flag: a run that inherits the last one's
   death cannot end, because `trip()` refuses to kill a run already marked dead.
 - `audio.js` — synthesised: envelopes on oscillators plus filtered noise. No files.
 
-Soft-body bounce lives in `character.js:J`. Amplitudes are small and clothed; the joke is
-the timing (a well-timed skip should make something wobble that was not asked to), not
-anatomy.
+The only soft parts left are the bob strands and one body spring (`character.js:J`): blocks
+do not jiggle, so the acting is silhouette - squash, tuck, lean, hair.
 
 ## Loop
 
@@ -123,9 +141,10 @@ her. Nothing you earn carries between runs.
 
 - Name, character design, palette, UI copy and card names are original. She has a teal bob
   and a hair clip, not anyone else's silhouette, and the other three jumpers are that one
-  rig recoloured and re-tuned rather than four borrowed designs.
-- Geometry, textures, canvas-drawn face atlas and audio are generated in this repo. No
-  imported model, texture, audio or font files exist here.
+  rig recoloured and re-tuned rather than four borrowed designs. Everyone in here is a
+  rectangle, which settles the suggestive-content question at the source.
+- Geometry, the face, the palette and audio are generated in this repo. No imported model,
+  texture, audio or font file exists here; `vendor/three.module.js` is MIT three.js.
 - Mechanics are not owned: one button, a jump rope, three-card drafts and stacking
   upgrades are the vocabulary of the genre. The expression (art, code, text, sound) is
   what has to differ, and it does, because it was written from scratch.
@@ -141,15 +160,16 @@ her. Nothing you earn carries between runs.
 | `game.js` | `BASE_SPEED` | rope revolutions per second |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
-| `character.js` | `J` | spring stiffness, damping and travel limits |
+| `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
+| `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |
 | `roster.js` | `ROSTER` | the four jumpers: look, blurb and starting numbers |
 
 ## Checks
 
-No build step and no test suite; behaviour was verified in a browser at 1280x720:
-title → roster → pick by key → run → level-up draft → card pick by key → trip → game over
-→ restart, plus 60 fps at three ropes, multi-hundred-metre altitude frames, and per-frame
-soft-body springs to confirm they travel asymmetrically instead of sitting at their clamps.
-`window.game.debug` exposes live state (`y`, `vy`, `phase`, `skips`, `state`, `char`) and
-`window.game.script` can drive input and grant cards, which is how those runs were driven.
+No build step and no test suite; behaviour was verified in a browser at 1024x707: title →
+roster → pick by key → run → level-up draft → card pick by key → trip → game over → restart,
+four jumpers, three ropes with fire, and 700 m frames driven through
+`window.game.script.fly()`. `window.game.debug` exposes live state (`y`, `vy`, `phase`,
+`skips`, `state`, `char`) and `window.game.script` drives input, grants cards and teleports,
+which is how those runs were driven.

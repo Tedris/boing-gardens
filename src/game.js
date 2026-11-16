@@ -7,7 +7,7 @@ import { createRopes } from './rope.js';
 import { CARDS, drawCards } from './cards.js';
 import { ROSTER, byId } from './roster.js';
 import { sfx } from './audio.js';
-import { canvasTex, spring, springState } from './toon.js';
+import { C, createPost, spring, springState } from './toon.js';
 
 const G = 23.5;              // gravity, m/s^2
 const JUMP_V = 5.75;         // base takeoff speed -> ~0.7m apex, ~0.49s airtime
@@ -28,40 +28,37 @@ const BEST_KEY = 'boing-gardens-best';
 const V3 = () => new THREE.Vector3();
 
 export function createGame(stage) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  // No antialiasing and no devicePixelRatio scaling: the picture is assembled at
+  // 240 rows and upscaled by hand, so any smoothing here undoes the look.
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(1);
   stage.appendChild(renderer.domElement);
+  const look = createPost(renderer, innerWidth, innerHeight);
 
   const scene = new THREE.Scene();
-  // low fov + dead-on axis is what makes the 3D read as a flat illustration
-  const camera = new THREE.PerspectiveCamera(22, 1, 0.1, 1200);
-  camera.position.set(0, 0.88, 7.8);
+  // One light and one fog, both part of the look: flat Lambert facets need a
+  // single direction to decide which faces are lit, and the fog is the same
+  // colour as the sky so the horizon dissolves instead of ending in an edge.
+  // The near edge is set every frame to land just behind her: fog depth is
+  // measured from the eye, and the camera sits 8.8-11.4 m back, so a fixed near
+  // edge of 7 puts the jumper inside the haze - invisible above 300 m.
+  scene.fog = new THREE.Fog(C.sky, 9.8, 22.8);
+  scene.background = new THREE.Color(C.sky);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1200);
+  camera.position.set(0, 1.05, 8.8);
 
-  // One light. The directional pair had no effect at any intensity, and point
-  // lights parked far off had none either (the fire rope's light, a metre from
-  // her hands, does work). The cel read comes from two-tone part colours plus
-  // ink outlines, so this fill only has to stop her going flat - and it does,
-  // at every altitude.
-  const hemi = new THREE.HemisphereLight(0xdff2ff, 0x8fbf72, 1.15);
-  scene.add(hemi);
-  // ground bounce: grass at park level, cold sky once the air thins out
-  const groundNear = new THREE.Color(0x8fbf72), groundSpace = new THREE.Color(0x6f89ad);
+  const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+  sun.position.set(0.6, 1.0, 0.7);     // front-upper-right: one face lit, one not
+  scene.add(sun);
 
-  // Contact shadow: one soft blob on the dirt that spreads and fades with height.
-  // Cheaper and far more readable at this scale than a shadow map that would have
-  // to chase her into the stratosphere.
+  // Contact shadow: a flat disc, black and hard-edged, that spreads and fades as
+  // she climbs. Cheaper and more readable at this scale than a shadow map that
+  // would have to chase her into the stratosphere - and it stays snap-exempt, so
+  // the one thing that tells you your height never crawls out of register.
   const blob = new THREE.Mesh(
-    new THREE.CircleGeometry(0.85, 24),
+    new THREE.CircleGeometry(0.55, 10),
     new THREE.MeshBasicMaterial({
-      map: canvasTex(64, 64, (g, w) => {
-        const r = g.createRadialGradient(w / 2, w / 2, 1, w / 2, w / 2, w / 2);
-        r.addColorStop(0, 'rgba(22,38,16,0.8)');
-        r.addColorStop(0.5, 'rgba(22,38,16,0.4)');
-        r.addColorStop(1, 'rgba(22,38,16,0)');
-        g.fillStyle = r;
-        g.fillRect(0, 0, w, w);
-      }),
-      transparent: true, depthWrite: false, opacity: 0.5,
+      color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false, fog: false,
     }),
   );
   blob.rotation.x = -Math.PI / 2;
@@ -151,7 +148,7 @@ export function createGame(stage) {
   let stumbled = false;        // a trip costs at most one rope per frame
   let hintT = 0, lostHint = false;   // the "ropes left" hint times itself out
   let paused = false;        // freezes step() wholesale; see setPause
-  let camY = 0.88, camZ = 7.8, time = 0, ropeBottom = 0.014, camDip = 0;
+  let camY = 1.05, camZ = 8.8, time = 0, ropeBottom = 0.014, camDip = 0;
   const sDip = springState();
   const hands = [V3(), V3()];
   let offerCards = [];
@@ -213,7 +210,7 @@ export function createGame(stage) {
     el.tag.textContent = 'One button. One rope. Endless altitude.';
     el.go.textContent = goText();
     el.stats.style.display = 'none';
-    camY = 0.9;
+    camY = 1.05;
   }
 
   function startRun() {
@@ -603,29 +600,38 @@ export function createGame(stage) {
     // a laggy follow lets a rocket climb walk her straight out of frame. The dip
     // spring keeps a little weight in ascents and landings.
     camDip = spring(sDip, THREE.MathUtils.clamp(-vy * 0.012, -0.32, 0.22), 55, 11, dt);
-    camY = Math.max(0, y) + 0.88 + camDip;
-    // ease back a little with height, then stop: she has to stay readable at 2 km
-    camZ += (7.8 + THREE.MathUtils.smoothstep(y, 12, 140) * 3.2 - camZ) * Math.min(1, dt * 2.2);
+    camY = Math.max(0, y) + 1.05 + camDip;
+    // ease back a little with height, then stop: she has to stay readable at 2 km,
+    // and at this fov she is already only a fifth of the frame on the ground
+    camZ += (8.8 + THREE.MathUtils.smoothstep(y, 12, 140) * 2.6 - camZ) * Math.min(1, dt * 2.2);
     shake = Math.max(0, shake - dt * 2.4);
     flash = Math.max(0, flash - dt * 2.2);
+    // The camera itself only twitches a little; the rest of the impact goes to the
+    // post pass, where a shake moves whole pixels instead of sliding the view.
     camPos.set(
-      Math.sin(time * 47) * shake * 0.13,
-      camY + Math.sin(time * 61) * shake * 0.11,
+      Math.sin(time * 47) * shake * 0.05,
+      camY + Math.sin(time * 61) * shake * 0.04,
       camZ,
     );
     camera.position.copy(camPos);
     camera.quaternion.identity();
 
-    // nothing here needs to follow her: a hemisphere fill is the same anywhere
     const spread = 1 + Math.min(2.4, Math.max(0, y) * 0.09);
     blob.scale.set(spread, spread, 1);
-    blob.material.opacity = Math.max(0, 0.5 - Math.max(0, y) * 0.035);
+    blob.material.opacity = Math.max(0, 0.45 - Math.max(0, y) * 0.03);
     blob.visible = blob.material.opacity > 0.01;
-    // thin air: the grass stops bouncing off her underside, which is the entire
-    // difference between the park look and the space look. Left green, she bakes.
+    // Thin air: the stage goes darker and the fog pulls in as the world below
+    // stops reflecting anything. The sky colour comes from the world, which owns
+    // the altitude bands, so the two can never disagree about what height this is.
     const space = THREE.MathUtils.smoothstep(y, 60, 260);
-    hemi.intensity = 1.15 - space * 0.1;
-    hemi.groundColor.lerpColors(groundNear, groundSpace, space);
+    if (world.skyColor) {
+      scene.background.copy(world.skyColor);
+      scene.fog.color.copy(world.skyColor);
+    }
+    // haze is eye-measured, so the clear zone travels with camZ: she stays
+    // readable at any height, the world keeps dissolving behind her
+    scene.fog.near = camZ + 1;
+    scene.fog.far = camZ + 14 - space * 5;
 
     world.update(dt, time, camPos.y, u.fire > 0 ? 1 : 0);
     el.flash.style.opacity = flash * 0.55;
@@ -635,12 +641,18 @@ export function createGame(stage) {
 
   function resize(w, h) {
     renderer.setSize(w, h, false);
+    look.resize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
 
+  /** The only draw path: scene into the 240-row buffer, buffer to the canvas. */
+  function render() {
+    look.render(scene, camera, shake * 2.2);
+  }
+
   return {
-    renderer, scene, camera, step, resize, press, release, pick, setTouchUI,
+    renderer, scene, camera, step, render, resize, press, release, pick, setTouchUI,
     setPause, togglePause, setCharacter, cycleCharacter, showSelect,
     get state() { return state; },
     get rig() { return char.rig; },
@@ -660,6 +672,9 @@ export function createGame(stage) {
         if (c) applyCard(c);
       },
       get: () => u,
+      /** teleport: the sky bands and the star tier have to be checkable without
+       *  climbing 300 m first. Height only; everything else follows from camY. */
+      fly(m) { y = Math.max(0, m); vy = 0; },
     },
   };
 }

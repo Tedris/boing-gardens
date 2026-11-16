@@ -1,46 +1,40 @@
-// Beaded jump ropes. Each rope is a real arc sweeping around the hand axis, so
-// the timing window is geometry, not a scripted animation. Extra ropes are the
-// same circle with a phase offset and a slightly longer radius.
+// Jump ropes in blocks. Each rope is a real arc sweeping around the hand axis, so
+// the timing window is geometry, not a scripted animation; extra ropes are the same
+// circle with a phase offset and a slightly longer radius.
+//
+// At 240 rows a rope is three pixels of cream across at best, so it is drawn as
+// unlit segments that ignore the fog - the sweep has to stay the brightest thing on
+// screen at every altitude, or the one thing you must read becomes a smudge. The
+// old look needed an inverted-hull outline to keep that arc legible; here the pixel
+// grid does it, and the outline would just be a second, darker rope.
 import * as THREE from '../vendor/three.module.js';
-import { C, toon, canvasTex } from './toon.js';
+import { C } from './toon.js';
 
-const K = 46;            // beads per rope
-const R = 0.03;          // rope thickness
+const K = 26;            // segments per rope: few enough that the arc reads as steps
+const R = 0.045;         // rope thickness
 const MAXR = 6;          // rope ceiling
 const UP = new THREE.Vector3(0, 1, 0);
 const GQ = new THREE.Quaternion();
 
+// cream with one contrasting stripe per rope: the stripe is what makes the sweep
+// readable in motion, and it is the only place a second colour appears on her
 const PAIRS = [
-  [0xf2f2f2, 0xef4b3c],
-  [0xf2f2f2, 0x38a3ff],
-  [0xfff0c8, 0x37c96f],
-  [0x2b2440, 0xffd23a],
-  [0xf2f2f2, 0xc05bff],
-  [0xffd9e6, 0xff5d8f],
+  [C.ropeA, 0xd0576f],
+  [C.ropeA, 0x5f7fa8],
+  [C.ropeA, 0x6f9a6a],
+  [C.ropeA, 0xd8a13c],
+  [C.ropeA, 0x8d6fb0],
+  [C.ropeA, 0xd0576f],
 ];
-
-function glowTex() {
-  return canvasTex(64, 64, (g, w) => {
-    const r = g.createRadialGradient(w / 2, w / 2, 1, w / 2, w / 2, w / 2);
-    r.addColorStop(0, 'rgba(255,246,214,1)');
-    r.addColorStop(0.28, 'rgba(255,178,44,0.9)');
-    r.addColorStop(0.62, 'rgba(255,96,20,0.35)');
-    r.addColorStop(1, 'rgba(255,70,10,0)');
-    g.fillStyle = r;
-    g.fillRect(0, 0, w, w);
-  });
-}
 
 export function createRopes() {
   const group = new THREE.Group();
 
-  const beadGeo = new THREE.CylinderGeometry(1, 1, 1, 7, 1, false);
-  const plain = toon(0xffffff, { steps: 3 });
-  const burning = new THREE.MeshToonMaterial({
-    color: 0xffffff, gradientMap: toon(0xffffff, { steps: 3 }).gradientMap,
-    emissive: 0xff7a12, emissiveIntensity: 0.85,
-  });
-  const inkMat = new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide });
+  // a box, not a cylinder: a seven-sided tube shades into a gradient, a box has
+  // two faces and therefore two values, which is what the whole look is
+  const segGeo = new THREE.BoxGeometry(1, 1, 1);
+  const plain = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
+  const burning = new THREE.MeshBasicMaterial({ color: C.fire, fog: false });
 
   const ropes = [];
   const dummy = new THREE.Object3D();
@@ -49,35 +43,22 @@ export function createRopes() {
   for (let i = 0; i <= K; i++) pts.push(new THREE.Vector3());
 
   for (let i = 0; i < MAXR; i++) {
-    const beads = new THREE.InstancedMesh(beadGeo, plain, K);
-    const hull = new THREE.InstancedMesh(beadGeo, inkMat, K);
-    beads.frustumCulled = hull.frustumCulled = false;
-    beads.castShadow = true;
+    const segs = new THREE.InstancedMesh(segGeo, plain, K);
+    segs.frustumCulled = false;
     const [a, b] = PAIRS[i % PAIRS.length];
     const ca = new THREE.Color(a), cb = new THREE.Color(b);
-    for (let k = 0; k < K; k++) beads.setColorAt(k, k % 2 ? ca : cb);
-    if (beads.instanceColor) beads.instanceColor.needsUpdate = true;
+    for (let k = 0; k < K; k++) segs.setColorAt(k, k % 2 ? ca : cb);
+    if (segs.instanceColor) segs.instanceColor.needsUpdate = true;
 
-    // flame halos ride every third bead
-    const glow = new THREE.InstancedMesh(
-      new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({
-        map: glowTex(), transparent: true, blending: THREE.AdditiveBlending,
-        depthWrite: false, toneMapped: false,
-      }),
-      Math.ceil(K / 3),
-    );
-    glow.frustumCulled = false;
-    glow.visible = false;
-
-    group.add(hull, beads, glow);
+    group.add(segs);
     ropes.push({
-      theta: Math.PI, prevAbs: Math.PI, beads, hull, glow, active: i === 0,
+      theta: Math.PI, prevAbs: Math.PI, beads: segs, active: i === 0,
       radius: 0, offset: 0, crossed: false,
     });
   }
 
-  // embers shed by burning ropes
+  // embers shed by burning ropes: ordinary squares, no additive blending, because
+  // additive light washes out the dither pattern it would be sitting on
   const NE = 140;
   const ePos = new Float32Array(NE * 3);
   const eVel = new Float32Array(NE * 3);
@@ -85,8 +66,8 @@ export function createRopes() {
   const eGeo = new THREE.BufferGeometry();
   eGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
   const embers = new THREE.Points(eGeo, new THREE.PointsMaterial({
-    color: 0xffb43c, size: 0.07, transparent: true, opacity: 0.9,
-    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+    color: C.fire, size: 0.055, transparent: true, opacity: 0.9,
+    depthWrite: false, fog: false, toneMapped: false,
   }));
   embers.frustumCulled = false;
   embers.visible = false;
@@ -98,7 +79,7 @@ export function createRopes() {
     for (let i = 0; i < MAXR; i++) {
       const r = ropes[i];
       r.active = i < n;
-      r.beads.visible = r.hull.visible = r.active;
+      r.beads.visible = r.active;
       r.radius = i * 0.055;
       // clustered phases: one well-timed jump clears every rope and each sweep
       // scores, so an extra rope reads as more skips, not a wider death window
@@ -130,20 +111,14 @@ export function createRopes() {
       GQ.setFromUnitVectors(UP, dir.multiplyScalar(1 / len));
       dummy.position.set((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, (a.z + b.z) * 0.5);
       dummy.quaternion.copy(GQ);
-      dummy.scale.set(R, len * 1.02, R);
+      dummy.scale.set(R, len * 1.06, R);
       dummy.updateMatrix();
       rope.beads.setMatrixAt(i, dummy.matrix);
-      dummy.scale.set(R * 1.55, len * 1.06, R * 1.55);
-      dummy.updateMatrix();
-      rope.hull.setMatrixAt(i, dummy.matrix);
     }
     rope.beads.instanceMatrix.needsUpdate = true;
-    rope.hull.instanceMatrix.needsUpdate = true;
     // clamp to the floor: a real rope lies down rather than passing through it
     return Math.max(hy - rad, ground + 0.014);
   }
-
-  let glowQuat = new THREE.Quaternion();
 
   return {
     group,
@@ -156,7 +131,6 @@ export function createRopes() {
      */
     update(dt, s) {
       const { hands, speed, length, ground } = s;
-      glowQuat = s.camQuat || glowQuat;
       let lowest = Infinity;
       let anyFire = false;
 
@@ -174,24 +148,13 @@ export function createRopes() {
 
         const lit = !!s.fire;
         r.beads.material = lit ? burning : plain;
-        r.glow.visible = lit;
         if (lit) {
           anyFire = true;
-          const flick = 1 + Math.sin(s.time * 27 + r.radius * 40) * 0.22;
-          for (let i = 0, g = 0; i < K; i += 3, g++) {
-            dummy.position.copy(pts[i]);
-            dummy.quaternion.copy(glowQuat);
-            const sc = (0.26 + 0.07 * Math.sin(i + s.time * 19)) * flick;
-            dummy.scale.set(sc, sc, sc);
-            dummy.updateMatrix();
-            r.glow.setMatrixAt(g, dummy.matrix);
-          }
-          r.glow.instanceMatrix.needsUpdate = true;
           // shed embers from the low front of the arc
           if (Math.random() < 0.35) {
-            const p = pts[(K * 0.25 + Math.floor(Math.random() * K * 0.5)) | 0];
+            const p = pts[(K * 0.25 + Math.random() * K * 0.5) | 0];
             const i3 = eNext++ % NE;
-            ePos[i3 * 3] = p.x; ePos[i3 * 3 + 1] = p.y; ePos[i3 * 3 + 2] = p.z;
+            ePos[i3 * 3] = p.x; ePos[i3 * 3 + 1] = p.y; ePos[i3 * 3 + 2] = p.z * 0.6;
             eVel[i3 * 3] = (Math.random() - 0.5) * 0.5;
             eVel[i3 * 3 + 1] = 0.6 + Math.random() * 1.1;
             eVel[i3 * 3 + 2] = (Math.random() - 0.5) * 0.5;
@@ -223,4 +186,3 @@ export function createRopes() {
     },
   };
 }
-

@@ -30,10 +30,10 @@ export const ROSTER = [
     blurb: 'Heavy. Every landing is an event, and the rope pities her.',
     look: {
       tint: {
-        [C.top]: 0x93a0b0, [C.topDk]: 0x76828f,
-        [C.shorts]: 0x4d5867, [C.shortsDk]: 0x3a4450,
-        [C.hair]: 0x5b6472, [C.hairLt]: 0x737d8c,
-        [C.shoe]: 0x31373f, [C.shoeSo]: 0x1c2128, [C.sock]: 0xd6dade,
+        [C.top]: 0x8a94a3, [C.topDk]: 0x6b7583,
+        [C.shorts]: 0x454e5c, [C.shortsDk]: 0x343c48,
+        [C.hair]: 0x4e5764, [C.hairLt]: 0x66707e,
+        [C.shoe]: 0x2a303a, [C.shoeSo]: 0x181d25, [C.sock]: 0xb9bec6,
       },
       w: 1.12, h: 0.95, squash: 1.45, jig: 0.65,
     },
@@ -54,11 +54,11 @@ export const ROSTER = [
     blurb: 'Falls like a rumour. The rope has to hurry to keep up.',
     look: {
       tint: {
-        [C.top]: 0xf2fbdc, [C.topDk]: 0xd6e9b8,
-        [C.shorts]: 0xa8d94f, [C.shortsDk]: 0x87b93a,
-        [C.hair]: 0xfff3c8, [C.hairLt]: 0xfff8de,
-        [C.skin]: 0xf9d3ad, [C.skinDk]: 0xe6b189,
-        [C.shoe]: 0xb6f000, [C.blush]: 0xffc0a8,
+        [C.top]: 0xc7d4ae, [C.topDk]: 0xa4b389,
+        [C.shorts]: 0x86a05a, [C.shortsDk]: 0x6b8447,
+        [C.hair]: 0xd8d2ab, [C.hairLt]: 0xe8e3c2,
+        [C.skin]: 0xd9c49f, [C.skinDk]: 0xb9a383,
+        [C.shoe]: 0x9dbb52, [C.blush]: 0xa8876f,
       },
       w: 0.94, h: 1.05, squash: 0.7, jig: 1.25,
     },
@@ -78,14 +78,15 @@ export const ROSTER = [
     name: 'The Prototype',
     blurb: 'Straight out of the old build: charge the button, pick a landing site.',
     look: {
-      // the rose-on-slate monochrome of the first web version, kept on purpose
+      // the rose-on-slate monochrome of the first web version, kept on purpose:
+      // on this stage she is nearly the same colour as the dark, which is the joke
       tint: {
-        [C.skin]: 0xdd7b90, [C.skinDk]: 0xc0647a,
-        [C.hair]: 0xc94f6d, [C.hairLt]: 0xd96d86,
-        [C.top]: 0xc94f6d, [C.topDk]: 0xa83f5b,
-        [C.shorts]: 0xb4455f, [C.shortsDk]: 0x94374f,
-        [C.shoe]: 0x1d2630, [C.shoeSo]: 0x141a22, [C.sock]: 0xe6c2ca,
-        [C.blush]: 0xf08fa0, [C.pupil]: 0x2a1f2a,
+        [C.skin]: 0xb9768a, [C.skinDk]: 0x9a5f72,
+        [C.hair]: 0x8e3f56, [C.hairLt]: 0xa8506a,
+        [C.top]: 0xa8455f, [C.topDk]: 0x7f3349,
+        [C.shorts]: 0x4a3a4a, [C.shortsDk]: 0x362c38,
+        [C.shoe]: 0x191e28, [C.shoeSo]: 0x11151c, [C.sock]: 0x9a878e,
+        [C.blush]: 0x8e5a68, [C.pupil]: 0x121722,
       },
       squash: 1.7,              // the old 0.6 pancake, spring and all
       jig: 0.9,
@@ -93,7 +94,7 @@ export const ROSTER = [
     apply: (u) => {
       u.jumpV *= 1.32;          // a tap is already a committed hop
       u.ropeSpeed *= 0.865;     // and the sweep runs on the old 1.3s clock
-      u.holdLift *= 2.0;        // hold, and the park leaves
+      u.holdLift *= 2.0;        // hold, and the stage leaves
       u.holdMax = 0.55;
       u.airJumps += 1;          // the old double, for the landings that were not
       u.fallDrag *= 1.06;       // comes down with intent
