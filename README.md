@@ -18,7 +18,7 @@ One button does everything: space / up / W / click / tap.
 
 | Input   | Effect                                                  |
 | ------- | ------------------------------------------------------- |
-| Press   | leave the ground                                         |
+| Press   | leave the ground; the press that starts a run is its first jump |
 | Hold    | stay up longer on the way up; burn rocket fuel in the air |
 | Release | let the arc fall                                         |
 | 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |

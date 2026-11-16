@@ -15,6 +15,12 @@ const HOLD_MAX = 0.40;       // seconds of hold assist
 const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
 const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
 const BASE_SPEED = (Math.PI * 2) / 1.05;
+
+// The press that starts a run is also its first jump, so that one arc has to still
+// be airborne when the rope comes round: half a sweep for the rope to get from
+// overhead to her feet, and the base hop lands 0.04s short of that. Scaling the
+// launch off the base hop keeps it honest when the jump cards move.
+const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.23x
 const BEST_KEY = 'boing-gardens-best';
 
 const V3 = () => new THREE.Vector3();
@@ -352,6 +358,16 @@ export function createGame(stage) {
         hint('');
         ropes.reset();
         sfx.whoosh();
+        // Starting the rope and leaving her standing makes the player tap again
+        // half a second later, mid-launch. One press starts the sweep and takes
+        // off, so the run begins on the beat instead of on a stumble.
+        vy = u.jumpV * LAUNCH;
+        grounded = false;
+        holdT = 0;
+        airLeft = u.airJumps;
+        sfx.boing(1);
+        char.bump(1);
+        char.puff(0, 0.05, 0.1, 0.9);
       }
     } else if (state === 'run') {
       u.time += dt;
