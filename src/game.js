@@ -25,6 +25,12 @@ const BASE_SPEED = (Math.PI * 2) / 1.05;
 const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.23x
 const BEST_KEY = 'boing-gardens-best';
 
+// Framing: a slight three-quarter view, not a flat lay. Dead-on, every box collapses to
+// its front face and the rope sweep stops reading as depth; ~16 degrees of yaw keeps her
+// face legible, shows one side facet of everything, and foreshortens the arc as it turns.
+const CAM_YAW = 0.28;      // radians. Offsets derive from camZ so the angle - not just
+const CAM_LIFT = 0.72;     // the pose - holds as the camera eases back with height.
+
 const V3 = () => new THREE.Vector3();
 
 export function createGame(stage) {
@@ -45,10 +51,11 @@ export function createGame(stage) {
   scene.fog = new THREE.Fog(C.sky, 9.8, 22.8);
   scene.background = new THREE.Color(C.sky);
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1200);
-  camera.position.set(0, 1.05, 8.8);
+  camera.position.set(8.8 * Math.tan(CAM_YAW), 1.05 + CAM_LIFT, 8.8);
+  camera.lookAt(0, 0.95, 0);
 
   const sun = new THREE.DirectionalLight(0xffffff, 2.4);
-  sun.position.set(0.6, 1.0, 0.7);     // front-upper-right: one face lit, one not
+  sun.position.set(-0.6, 1.0, 0.7);     // front-upper-left: near face lit, side facet dark
   scene.add(sun);
 
   // Contact shadow: a flat disc, black and hard-edged, that spreads and fades as
@@ -535,7 +542,6 @@ export function createGame(stage) {
       const speed = state === 'run' ? u.ropeSpeed * (1 + Math.min(0.35, u.time * 0.004)) : 0;
       ropeBottom = ropes.update(state === 'run' ? dt : 0, {
         hands, speed, length: ROPE_A, ground: 0, fire: u.fire > 0, time,
-        camQuat: camera.quaternion,
       });
 
       if (state === 'run') {
@@ -609,12 +615,14 @@ export function createGame(stage) {
     // The camera itself only twitches a little; the rest of the impact goes to the
     // post pass, where a shake moves whole pixels instead of sliding the view.
     camPos.set(
-      Math.sin(time * 47) * shake * 0.05,
-      camY + Math.sin(time * 61) * shake * 0.04,
+      camZ * Math.tan(CAM_YAW) + Math.sin(time * 47) * shake * 0.05,
+      camY + CAM_LIFT + Math.sin(time * 61) * shake * 0.04,
       camZ,
     );
     camera.position.copy(camPos);
-    camera.quaternion.identity();
+    // Aimed, not aligned to the axes: yaw and tilt come from one look, so easing back
+    // with height keeps the same three-quarter framing instead of drifting flat-on.
+    camera.lookAt(0, camY - 0.1, 0);
 
     const spread = 1 + Math.min(2.4, Math.max(0, y) * 0.09);
     blob.scale.set(spread, spread, 1);
@@ -628,10 +636,12 @@ export function createGame(stage) {
       scene.background.copy(world.skyColor);
       scene.fog.color.copy(world.skyColor);
     }
-    // haze is eye-measured, so the clear zone travels with camZ: she stays
-    // readable at any height, the world keeps dissolving behind her
-    scene.fog.near = camZ + 1;
-    scene.fog.far = camZ + 14 - space * 5;
+    // Haze is eye-measured, so the clear zone travels with the real distance to her,
+    // which the yaw makes longer than camZ. She stays readable at any height; the world
+    // keeps dissolving behind her.
+    const eye = camZ / Math.cos(CAM_YAW);
+    scene.fog.near = eye + 1;
+    scene.fog.far = eye + 14 - space * 5;
 
     world.update(dt, time, camPos.y, u.fire > 0 ? 1 : 0);
     el.flash.style.opacity = flash * 0.55;

@@ -11,7 +11,9 @@ import * as THREE from '../vendor/three.module.js';
 import { C } from './toon.js';
 
 const K = 26;            // segments per rope: few enough that the arc reads as steps
-const R = 0.045;         // rope thickness
+const R = 0.08;         // rope thickness: at 240 rows this is a four-pixel band, which is
+                        // what survives the upscale; thinner reads as a hairline
+const BOW = 1.0;        // extra lateral spread aloft, added at the mid-rope
 const MAXR = 6;          // rope ceiling
 const UP = new THREE.Vector3(0, 1, 0);
 const GQ = new THREE.Quaternion();
@@ -92,12 +94,18 @@ export function createRopes() {
     const hy = (hands[0].y + hands[1].y) * 0.5;
     const hz = (hands[0].z + hands[1].z) * 0.5;
     const rad = A + rope.radius;
+    const cx = (hx0 + hx1) * 0.5;
     const ct = Math.cos(theta), st = Math.sin(theta);
     for (let i = 0; i <= K; i++) {
       const t = i / K;
       const prof = Math.pow(Math.sin(Math.PI * t), 0.72);
+      // the arc bows outward as it rises: a straight line between the hands is a narrow
+      // hoop that reads as a hula hoop, while a rope turning on a hands axis swings wide
+      // aloft and converges at the handles. The bow is lateral only - height, and so the
+      // timing window, is untouched.
+      const bow = 1 + BOW * prof;
       pts[i].set(
-        hx0 + (hx1 - hx0) * t,
+        cx + (hx0 + (hx1 - hx0) * t - cx) * bow,
         Math.max(hy - rad * prof * ct, ground + 0.014),
         // minus: a rope comes down in front, passes under the feet and rises
         // behind her, so the arc travels toward her back just after the bottom
@@ -125,7 +133,7 @@ export function createRopes() {
     ropes,
     setCount,
     /**
-     * s = { hands:[Vector3,Vector3], speed, fire, ground, time, camQuat,
+     * s = { hands:[Vector3,Vector3], speed, fire, ground, time,
      *       length }  length = hand-to-ground reach + slack
      * Returns the lowest point any rope reaches this frame.
      */

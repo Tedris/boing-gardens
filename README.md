@@ -72,8 +72,11 @@ phone that shows nothing and a phone that ignores input are the same report.
 A PS1-era software renderer, approximated in two passes. The scene is real 3D - boxes,
 flat-shaded Lambert facets, one directional light, one fog - rendered into a 240-row
 target and then upscaled by hand: sRGB encode, 4x4 Bayer dither, quantise to 31 levels
-(`toon.js:createPost`). The camera sits on a dead-on axis and never rotates, so the
-projection stays near-orthographic and a pose reads the way it was posed.
+(`toon.js:createPost`). The camera is aimed, not aligned to the axes: a fixed 16-degree
+yaw and a slight tilt (`game.js:CAM_YAW`, `CAM_LIFT`), so she is a three-quarter figure —
+one face of every box lit and one dark, and the rope's arc foreshortens as it turns
+instead of sliding down a flat plane. The angle is derived from the camera distance, so
+it holds as the camera eases back with height.
 
 Everything else follows from those two decisions:
 
@@ -103,10 +106,11 @@ is what keeps it readable at any rope count or height:
   plus shape scalars handed to `character.js:setLook`, and `apply` patches a fresh run's
   numbers in the same style as a card, so a character is a starting build that cards still
   stack on top of. The blurb is the spec — if she falls like a rumour, `fallDrag` says so.
-- `rope.js` — each rope is a real arc rotating around the hand axis, beaded so the sweep
-  is legible and the stripes read at speed. It turns the way a rope actually turns - down
-  the front, under the feet, up the back - so depth enters as `-sin(theta)` and the hand
-  target in `character.js` sweeps with it. It clamps to the floor instead of passing
+- `rope.js` — each rope is a real arc rotating around the hand axis, beaded so the sweep is
+  legible and the stripes read at speed, and bowing outward aloft so it reads as a rope on
+  a pivot rather than a narrow hoop. It turns the way a rope actually turns - down the
+  front, under the feet, up the back - so depth enters as `-sin(theta)` and the hand target
+  in `character.js` sweeps with it. It clamps to the floor instead of passing
   through it, which is what ropes do. Whether a sweep counts is *not* read off that arc:
   the jump stretch and arm swing lift the hands, so the pass/fail plane follows her feet
   instead: off the floor when the rope comes round is a skip, a foot down is a wipeout.
@@ -160,6 +164,8 @@ her. Nothing you earn carries between runs.
 | `game.js` | `BASE_SPEED` | rope revolutions per second |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
+| `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |
+| `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |

@@ -49,11 +49,12 @@ export function createWorld() {
   floor.rotation.x = -Math.PI / 2;
   group.add(floor);
 
-  // two marks on the floor, both flush: a worn patch darker than the ground around
-  // it, and a stone strip off to one side. Raise either by a centimetre and it
-  // stops being a mark and becomes a slab lying on the stage.
-  const pad = part(box, C.grassDk);
-  pad.scale.set(2.8, 0.02, 2.8);
+  // two marks on the floor, both flush: a worn patch and a stone strip off to one side.
+  // Both are *lighter* than the ground: at a three-quarter angle a darker mark stops
+  // reading as a scuff and reads as a hole cut in the stage. Raise either by a centimetre
+  // and it stops being a mark and becomes a slab lying on the stage.
+  const pad = part(box, C.stone);
+  pad.scale.set(2.2, 0.02, 2.2);
   pad.position.set(0, -0.009, -0.4);
   const strip = part(box, C.stone);
   strip.scale.set(5.5, 0.02, 0.6);

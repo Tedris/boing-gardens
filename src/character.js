@@ -205,16 +205,18 @@ export function createCharacter() {
   // no nose: at three pixels wide a nose is a shadow, and between two blush
   // squares it read as a muzzle. The face is eyes and mouth, or it is nothing.
 
-  // the bob: a slab over the crown, a slab behind, one on each side. Four boxes
-  // read as a bob at this size; a sculpted shell reads as a helmet.
-  const crown = part(box(0.50, 0.13, 0.47), C.hair);
+  // the bob: a slab over the crown, a slab behind, one on each side. Four boxes read as
+  // a bob at this size; a sculpted shell reads as a helmet. Nothing sits deeper behind
+  // her than the skull: at a three-quarter angle back-overhang draws as a black fin off
+  // the silhouette, which dead-on was hidden behind the head.
+  const crown = part(box(0.50, 0.13, 0.42), C.hair);
   crown.position.y = 0.40;
   head.add(crown);
   const bangs = part(box(0.47, 0.085, 0.085), C.hairLt);
   bangs.position.set(0, 0.30, 0.19);
   head.add(bangs);
   const hairBack = part(box(0.50, 0.36, 0.13), C.hair);
-  hairBack.position.set(0, 0.19, -0.185);
+  hairBack.position.set(0, 0.19, -0.135);
   head.add(hairBack);
   rig.hairBack = hairBack;
   const sides = [];
