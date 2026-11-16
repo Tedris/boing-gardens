@@ -15,10 +15,10 @@ const P = {
 
 // jiggle feel: k = stiffness, d = damping, g = how hard gravity/accel pulls
 const J = {
-  bust: { k: 145, d: 11.5, g: 0.008, max: 0.05 },
-  butt: { k: 175, d: 13.0, g: 0.006, max: 0.04 },
-  hair: { k: 95, d: 9.0, max: 0.42 },
-  body: { k: 60, d: 9.5, g: 0.016, max: 0.10 },
+  bust: { k: 145, d: 11.5, g: 0.0045, max: 0.026 },
+  butt: { k: 175, d: 13.0, g: 0.0035, max: 0.022 },
+  hair: { k: 95, d: 9.0, max: 0.3 },
+  body: { k: 60, d: 9.5, g: 0.011, max: 0.06 },
 };
 
 const clamp = THREE.MathUtils.clamp;
@@ -141,7 +141,9 @@ export function createCharacter() {
   rig.hips = hips;
 
   const pelvis = part(new THREE.SphereGeometry(0.185, 16, 12), C.shorts);
-  pelvis.scale.set(1, 0.72, 0.86);
+  // shorts sit on the hips, not up in the ribs: the tee hem below overlaps this
+  pelvis.position.y = -0.02;
+  pelvis.scale.set(0.94, 0.62, 0.82);
   hips.add(pelvis);
 
   // butt springs ride the pelvis: clothed, purely comedic weight
@@ -216,10 +218,6 @@ export function createCharacter() {
   const waist = part(new THREE.CapsuleGeometry(0.115, 0.10, 4, 12), C.skin);
   waist.position.y = P.waistY;
   torso.add(waist);
-  const belt = part(new THREE.TorusGeometry(0.122, 0.022, 6, 16), C.shorts);
-  belt.rotation.x = Math.PI / 2;
-  belt.position.y = 0.945;
-  torso.add(belt);
 
   const chest = new THREE.Group();
   chest.position.y = 0;
@@ -230,8 +228,8 @@ export function createCharacter() {
   top.position.y = P.chestY;
   top.scale.set(1, 1, 0.9);
   chest.add(top);
-  const hem = part(new THREE.CylinderGeometry(0.172, 0.178, 0.05, 14), C.topDk);
-  hem.position.y = 1.045;
+  const hem = part(new THREE.CylinderGeometry(0.172, 0.19, 0.14, 14), C.topDk);
+  hem.position.y = 0.99;
   chest.add(hem);
   const collar = part(new THREE.TorusGeometry(0.088, 0.028, 6, 14), C.topDk);
   collar.rotation.x = Math.PI / 2;
@@ -595,7 +593,7 @@ export function createCharacter() {
         continue;
       }
       a.wrist.rotation.x = 0.2 * Math.sin(ph);
-      reach(a, a.sx * 0.3, 1.05 - 0.05 * Math.cos(ph), 0.05 + 0.1 * Math.sin(ph));
+      reach(a, a.sx * 0.3, 1.05 - 0.05 * Math.cos(ph), 0.05 - 0.1 * Math.sin(ph));
     }
 
     // ---- head keeps its own balance so the face stays readable ----

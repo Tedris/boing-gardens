@@ -169,10 +169,17 @@ export function createGame(stage) {
 
   // ---------------- flow ----------------
   function startRun() {
+    // A new run has to start clean. Without this the last run's stats, pose and
+    // limp flag carried over - and trip() refuses to end a run that is already
+    // marked dead, so the second run of a session became unwinnable.
+    freshRun();
+    char.rig.hips.rotation.set(0, 0, 0);
+    char.group.rotation.set(0, 0, 0);
+    char.group.position.set(0, 0, 0);
+    camY = 0.9;
     el.screen.classList.add('off');
     state = 'ready';
     hint('press to start the rope');
-    ropes.reset();
   }
 
   function trip() {

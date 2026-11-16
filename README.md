@@ -42,7 +42,9 @@ is what keeps it readable at any rope count or height:
   hands at the anchors the rope hangs from, so the arm pose is a *consequence* of the rope
   instead of a keyframed guess that has to match it.
 - `rope.js` — each rope is a real arc rotating around the hand axis, beaded so the sweep
-  is legible and the stripes read at speed. It clamps to the floor instead of passing
+  is legible and the stripes read at speed. It turns the way a rope actually turns - down
+  the front, under the feet, up the back - so depth enters as `-sin(theta)` and the hand
+  target in `character.js` sweeps with it. It clamps to the floor instead of passing
   through it, which is what ropes do. Whether a sweep counts is *not* read off that arc:
   the jump stretch and arm swing lift the hands, so the pass/fail plane follows her feet
   instead: off the floor when the rope comes round is a skip, a foot down is a wipeout.
@@ -52,7 +54,9 @@ is what keeps it readable at any rope count or height:
 - `world.js` — park at ground level, a cloud band that recycles around the camera, sky
   that fades to space, all altitude-driven.
 - `game.js` — one-button physics, the level-up draft, camera. Vertical camera tracking is
-  near-rigid so a rocket climb can't walk her out of frame.
+  near-rigid so a rocket climb can't walk her out of frame. Every run begins in
+  `startRun()`, which clears stats *and* the dead flag: a run that inherits the last one's
+  death cannot end, because `trip()` refuses to kill a run already marked dead.
 - `audio.js` — synthesised: envelopes on oscillators plus filtered noise. No files.
 
 Soft-body bounce lives in `character.js:J`. Amplitudes are small and clothed; the joke is

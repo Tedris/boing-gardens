@@ -118,7 +118,9 @@ export function createRopes() {
       pts[i].set(
         hx0 + (hx1 - hx0) * t,
         Math.max(hy - rad * prof * ct, ground + 0.014),
-        hz + rad * prof * st + prof * prof * 0.05,
+        // minus: a rope comes down in front, passes under the feet and rises
+        // behind her, so the arc travels toward her back just after the bottom
+        hz - rad * prof * st + prof * prof * 0.05,
       );
     }
     for (let i = 0; i < K; i++) {
