@@ -16,8 +16,9 @@ const R = 0.08;         // rope thickness: at 240 rows this is a four-pixel band
 const BOW = 1.0;        // extra lateral spread aloft, added at the mid-rope
 const MAXR = 6;          // rope ceiling
 const LAG = Math.PI * 0.5; // preferred phase step between ropes: a quarter turn, 0.25 s a part
-const HOP_SPAN = 0.7;     // turns of the sweep one fully held hop stays airborne (game.js JUMP_V,
-                          // HOLD_LIFT, HOLD_MAX): the span every rope has to fit inside
+const HOP_SPAN = 0.61;    // turns of the sweep one fully held hop stays airborne, measured on the
+                          // build (game.js JUMP_V, HOLD_LIFT, HOLD_MAX): the span every rope has
+                          // to fit inside
 const UP = new THREE.Vector3(0, 1, 0);
 const GQ = new THREE.Quaternion();
 

@@ -21,11 +21,6 @@ const ROPE_W = 0.38;         // radians around bottom that count as "rope at the
 const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
                                          // lands on the sweep, slower and the rope stops driving
 
-// The press that starts a run is also its first jump, so that one arc has to still be airborne
-// when the rope comes round: half a sweep for the rope to get from overhead to her feet, and a
-// tap is off the ground for barely two thirds of that. Scaling the launch off the base hop keeps
-// it honest when the jump cards move.
-const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.78x
 const BEST_KEY = 'boing-gardens-best';
 
 // Framing: a slight three-quarter view, not a flat lay. Dead-on, every box collapses to
@@ -149,7 +144,7 @@ export function createGame(stage) {
     });
     // who is jumping decides the starting numbers; cards stack on top of that
     who().apply(u);
-    y = 0; vy = 0; grounded = true; holdT = 0; holding = false;
+    y = 0; vy = 0; grounded = true; holdT = 0; holding = false; launchT = 0;
     camAnchor = 0; camY = 1.05;   // a new run frames the ground, not the last run's ceiling
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
@@ -161,7 +156,7 @@ export function createGame(stage) {
   }
 
   let state = 'title';         // title | ready | run | draft | over
-  let y = 0, vy = 0, grounded = true, holdT = 0, holding = false;
+  let y = 0, vy = 0, grounded = true, holdT = 0, holding = false, launchT = 0;
   let airLeft = 0, thrusting = false, dead = false, deadT = 0;
   let shake = 0, flash = 0, nearMiss = 0, lastSkipT = -9;
   let pressEdge = false, down = false;
@@ -508,10 +503,13 @@ export function createGame(stage) {
         hint('');
         ropes.reset();
         sfx.whoosh();
-        // Starting the rope and leaving her standing makes the player tap again
-        // half a second later, mid-launch. One press starts the sweep and takes
-        // off, so the run begins on the beat instead of on a stumble.
-        vy = u.jumpV * LAUNCH;
+        // Starting the rope and leaving her standing makes the player tap again half a second
+        // later, mid-launch, so one press starts the sweep and takes off and the run begins on
+        // the beat. The rope needs half a revolution to come down to her feet, so this arc is
+        // given the hold assist whether or not the key is still down: the height of any held
+        // press, which is off the ground for longer than that.
+        vy = u.jumpV;
+        launchT = u.holdMax;
         grounded = false;
         holdT = 0;
         airLeft = u.airJumps;
@@ -543,7 +541,10 @@ export function createGame(stage) {
       if (thrusting) u.fuel = Math.max(0, u.fuel - dt / Math.max(0.2, u.fuelMax));
 
       let a = -G * (vy < 0 ? u.fallDrag : 1);
-      if (holding) a += u.holdLift;
+      // The opening hop spends its assist here, so a held press and the press that started the
+      // run get one assist window each, never two stacked on the same arc.
+      if (launchT > 0 && !grounded) { a += u.holdLift; launchT = Math.max(0, launchT - dt) }
+      else if (holding) a += u.holdLift;
       if (thrusting) a += u.thrust;
       vy += a * dt;
       y += vy * dt;
