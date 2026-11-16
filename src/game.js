@@ -15,9 +15,6 @@ const JUMP_V = 3.8;          // a tap: ~0.31m apex, ~0.32s off the ground - over
 const HOLD_LIFT = 13.2;      // extra upward accel while holding, which is what turns that tap
                              // into the ~0.70m hop a single press used to give on its own
 const HOLD_MAX = 0.40;       // seconds of hold assist: the held apex arrives as it runs out
-// Bumped when Muffler became the roster's first row: the first row is the default,
-// and a pick saved by the four-jumper roster would otherwise pin the old one for good.
-const CHAR_KEY = 'boing-gardens-char-2';
 const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
 const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
 const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
@@ -28,8 +25,11 @@ const BEST_KEY = 'boing-gardens-best';
 // Framing: a slight three-quarter view, not a flat lay. Dead-on, every box collapses to
 // its front face and the rope sweep stops reading as depth; ~16 degrees of yaw keeps her
 // face legible, shows one side facet of everything, and foreshortens the arc as it turns.
-const CAM_YAW = 0.28;      // radians. Offsets derive from camZ so the angle - not just
-const CAM_LIFT = 0.72;     // the pose - holds as the camera eases back with height.
+const CAM_YAW = 0.294;     // radians. Offsets derive from camZ so the angle - not just
+const CAM_LIFT = 1.10;     // the pose - holds as the camera eases back with height. camZ is
+                           // the depth axis, so her distance is camZ / cos(yaw) = 8.98 m, and
+                           // lift plus the 0.1 aim offset over that span is the 7.6 degrees
+                           // of downcast the frame is built around.
 
 // A hop should not move the picture. The frame is parked over a height and only slides
 // when the predicted end of her arc leaves the band she needs: CLEAR above her feet for
@@ -55,12 +55,12 @@ export function createGame(stage) {
   // single direction to decide which faces are lit, and the fog is the same
   // colour as the sky so the horizon dissolves instead of ending in an edge.
   // The near edge is set every frame to land just behind her: fog depth is
-  // measured from the eye, and the camera sits 8.8-11.4 m back, so a fixed near
+  // measured from the eye, and the camera sits 8.6-11.2 m back, so a fixed near
   // edge of 7 puts the jumper inside the haze - invisible above 300 m.
   scene.fog = new THREE.Fog(C.sky, 9.8, 22.8);
   scene.background = new THREE.Color(C.sky);
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1200);
-  camera.position.set(8.8 * Math.tan(CAM_YAW), 1.05 + CAM_LIFT, 8.8);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1200);
+  camera.position.set(8.6 * Math.tan(CAM_YAW), 1.05 + CAM_LIFT, 8.6);
   camera.lookAt(0, 0.95, 0);
 
   const sun = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -339,16 +339,16 @@ export function createGame(stage) {
   }
 
   // ---------------- who is jumping ----------------
-  // The roster is a choice made once and remembered. The look is the same rig
-  // recoloured and rescaled (character.js setLook); the physics is a patch over a
-  // fresh run, so a jumper and an upgrade deck compose instead of fighting.
-  let charId = byId(localStorage.getItem(CHAR_KEY)).id;
+  // The look is the same rig recoloured and rescaled (character.js setLook); the physics is
+  // a patch over a fresh run, so a jumper and an upgrade deck compose instead of fighting.
+  // The pick is not remembered: every load starts on the roster's first row, and pressing a
+  // number changes the run you are in.
+  let charId = ROSTER[0].id;
   const who = () => byId(charId);
 
   function setCharacter(id) {
     const c = byId(id);
     charId = c.id;
-    localStorage.setItem(CHAR_KEY, charId);
     char.setLook(c.look);
     el.pickName.textContent = c.name;
     [...el.pickRow.children].forEach((d, i) => d.classList.toggle('sel', ROSTER[i].id === charId));
@@ -703,7 +703,7 @@ export function createGame(stage) {
       : gap * Math.min(1, dt * CAM_CHASE) + (camAnchor - parkFrom);
     // ease back a little with height, then stop: she has to stay readable at 2 km,
     // and at this fov she is already only a fifth of the frame on the ground
-    camZ += (8.8 + THREE.MathUtils.smoothstep(camY, 12, 140) * 2.6 - camZ) * Math.min(1, dt * 2.2);
+    camZ += (8.6 + THREE.MathUtils.smoothstep(camY, 12, 140) * 2.6 - camZ) * Math.min(1, dt * 2.2);
     shake = Math.max(0, shake - dt * 2.4);
     flash = Math.max(0, flash - dt * 2.2);
     // The camera itself only twitches a little; the rest of the impact goes to the
