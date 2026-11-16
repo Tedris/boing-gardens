@@ -216,7 +216,9 @@
     .card .key{grid-column:2;grid-row:4;justify-self:start}
     .card:hover,.card.sel{transform:none}
     #draft h2{font-size:min(6vh,44px);top:5vh;white-space:nowrap}
-    #screen h1{font-size:min(11vh,72px)}
+    #screen h1{font-size:min(8.5vh,58px)}
+    /* the staggered second line must clear a 393px-wide screen */
+    #screen h1 span{margin-left:min(1.6em,9vw)}
     #screen .panel{max-width:92vw}
     #screen .tag{font-size:14px}
     #screen .legal{margin-top:16px;font-size:10px}
