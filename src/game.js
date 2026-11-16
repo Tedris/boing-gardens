@@ -7,7 +7,7 @@ import { createRopes } from './rope.js';
 import { CARDS, drawCards } from './cards.js';
 import { ROSTER, byId } from './roster.js';
 import { sfx } from './audio.js';
-import { C, createPost, spring, springState } from './toon.js';
+import { C, createPost } from './toon.js';
 
 const G = 23.5;              // gravity, m/s^2
 const JUMP_V = 5.75;         // base takeoff speed -> ~0.7m apex, ~0.49s airtime
@@ -30,6 +30,15 @@ const BEST_KEY = 'boing-gardens-best';
 // face legible, shows one side facet of everything, and foreshortens the arc as it turns.
 const CAM_YAW = 0.28;      // radians. Offsets derive from camZ so the angle - not just
 const CAM_LIFT = 0.72;     // the pose - holds as the camera eases back with height.
+
+// A hop should not move the picture. The frame is parked over a height and only slides
+// when the predicted end of her arc leaves the band she needs: CLEAR above her feet for
+// body, bob and the rope hump, DROP below for shoes and ground. LOOK_AHEAD caps how far
+// ahead the prediction looks, CAM_CHASE how fast the parked frame travels once it moves.
+const CLEAR = 2.3;
+const DROP = 0.45;
+const LOOK_AHEAD = 1.4;
+const CAM_CHASE = 6;      // a rise takes about 0.35 s; this arrives with her, not after
 
 const V3 = () => new THREE.Vector3();
 
@@ -138,6 +147,7 @@ export function createGame(stage) {
     // who is jumping decides the starting numbers; cards stack on top of that
     who().apply(u);
     y = 0; vy = 0; grounded = true; holdT = 0; holding = false;
+    camAnchor = 0; camY = 1.05;   // a new run frames the ground, not the last run's ceiling
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
     stumbled = false; hintT = 0; lostHint = false;
@@ -155,8 +165,10 @@ export function createGame(stage) {
   let stumbled = false;        // a trip costs at most one rope per frame
   let hintT = 0, lostHint = false;   // the "ropes left" hint times itself out
   let paused = false;        // freezes step() wholesale; see setPause
-  let camY = 1.05, camZ = 8.8, time = 0, ropeBottom = 0.014, camDip = 0;
-  const sDip = springState();
+  let camY = 1.05, camZ = 8.8, time = 0, ropeBottom = 0.014, camAnchor = 0;
+  // the camera's own live numbers, next to the physics ones: what the park window is,
+  // what the arc is predicted to reach, and whether it had to follow instead of lead
+  const camDbg = { lo: 0, hi: 0, up: 0, down: 0, follow: 0, a: 0 };
   const hands = [V3(), V3()];
   let offerCards = [];
 
@@ -440,6 +452,41 @@ export function createGame(stage) {
   // ---------------- step ----------------
   const camPos = new THREE.Vector3();
 
+  // Where the arc tops out and bottoms out over the next LOOK_AHEAD seconds. The window is
+  // the whole point: a bound that reaches further than the frame can travel is worse than
+  // none, since the frame ends up parked somewhere she is not - which is what pre-parking
+  // on a landing point a hundred metres down did. Two-segment closed form, sampled: gravity
+  // plus whatever hold assist or burn is still owed, for exactly as long as it is owed.
+  function arcY(t) {
+    const lift = (holding ? u.holdLift : 0) + (thrusting ? u.thrust : 0);
+    const owed = Math.min(LOOK_AHEAD, Math.max(
+      holding ? Math.max(0, u.holdMax - holdT) : 0,
+      thrusting ? u.fuel * Math.max(0.2, u.fuelMax) : 0));
+    const g = -G * (vy < 0 ? u.fallDrag : 1);
+    if (t <= owed) return y + vy * t + 0.5 * (g + lift) * t * t;
+    const v = vy + (g + lift) * owed;
+    const h = y + vy * owed + 0.5 * (g + lift) * owed * owed;
+    return h + v * (t - owed) + 0.5 * g * (t - owed) * (t - owed);
+  }
+
+  const SPAN = [0.2, 0.45, 0.75, 1.1, 1.5, 2];      // fractions of LOOK_AHEAD, sampled
+
+  function predictTop() {
+    if (grounded) return y;
+    let best = y;
+    for (const f of SPAN) best = Math.max(best, arcY(f * LOOK_AHEAD));
+    // one chained air jump: the ceiling she reaches if she presses again mid-arc
+    if (airLeft > 0) best += (u.jumpV * 0.8) * (u.jumpV * 0.8) / (2 * G);
+    return best;
+  }
+
+  function predictFloor() {
+    if (vy >= 0) return y;
+    let low = y;
+    for (const f of SPAN) low = Math.min(low, arcY(f * LOOK_AHEAD));
+    return Math.max(0, low);
+  }
+
   function step(dt) {
     if (paused) return;      // frozen: no physics, no sweep, no timers
     time += dt;
@@ -602,14 +649,54 @@ export function createGame(stage) {
     }
 
     // ---------------- camera ----------------
-    // Track her height near-rigidly: the park falling away below is the point, and
-    // a laggy follow lets a rocket climb walk her straight out of frame. The dip
-    // spring keeps a little weight in ascents and landings.
-    camDip = spring(sDip, THREE.MathUtils.clamp(-vy * 0.012, -0.32, 0.22), 55, 11, dt);
-    camY = Math.max(0, y) + 1.05 + camDip;
+    // Parked, not tracking: her height alone never moves the picture. The frame slides
+    // only when where the arc is *going* - this jump, the hold on top of it, the rocket
+    // burn, one chained air jump - would push her out of the band the body and the rope
+    // need. Aiming at the predicted apex makes the move arrive before she does, so the
+    // camera never chases her from behind. Everything the stage derives from height (sky,
+    // fog, tiers, pullback) reads camY, so the world cannot disagree with the frame.
+    const eye = camZ / Math.cos(CAM_YAW);
+    const half = Math.tan(camera.fov * Math.PI / 360) * eye;    // frame half-height at her plane
+    const midOff = 1.05 - 0.1;                  // frame centre above the parked height
+    const upY = predictTop(), downY = predictFloor();
+    // Two windows on the park height, both measured in the same band: where she is now, and
+    // where the arc says she is going. topRoom/botRoom are how far above and below the park
+    // she may be before she is out of the picture - the frame's half-height less what her body
+    // and the rope hump need, so they travel with the pullback instead of drifting from it.
+    const topRoom = midOff + half - CLEAR;
+    const botRoom = half - DROP - midOff;
+    const nowLo = y - topRoom, nowHi = y + botRoom;
+    const arcLo = Math.max(upY, y) - topRoom, arcHi = Math.min(downY, y) + botRoom;
+    const parkFrom = camAnchor;
+    // The arc window is a licence to get there first; the present window is the rule that
+    // cannot break. Where they overlap the frame moves only if it has to leave the overlap,
+    // which is why an ordinary hop costs nothing on screen. An arc longer than the band leaves
+    // the licence void, and then the frame keeps up with her instead of getting ahead of her -
+    // which is what a long fall is. Tested as two clamps in sequence, the second undid the
+    // first and framed a fall where she had not got to yet.
+    const lo = Math.max(arcLo, nowLo), hi = Math.min(arcHi, nowHi);
+    camAnchor = lo <= hi
+      ? Math.min(Math.max(camAnchor, lo), hi)
+      : Math.min(Math.max(camAnchor, nowLo), nowHi);
+    // Feet down is its own case: the park then means the framing she stands in, so whatever
+    // height a climb or a fall left it at is given back while her feet are on the ground.
+    // Without this the frame keeps the last arc's height and she stands at the bottom of the
+    // shot for the rest of the run.
+    if (grounded) camAnchor += (y - camAnchor) * Math.min(1, dt * CAM_CHASE);
+    camDbg.lo = lo; camDbg.hi = hi; camDbg.up = upY; camDbg.down = downY;
+    camDbg.a = camAnchor;
+    const gap = camAnchor + 1.05 - camY;
+    // The park's own motion is applied outright and only the step it had to take is eased:
+    // chasing instead of following trails a fast rise by its speed over the ease rate, which
+    // is enough to clip her head at the top of the frame. And when what is left of that ease
+    // is itself more than the band - a stacked-rocket run leaving the ground at a kilometre a
+    // second - the frame is put where the park says it belongs, because being late is the same
+    // as being wrong.
+    camY += Math.abs(gap) > topRoom ? gap
+      : gap * Math.min(1, dt * CAM_CHASE) + (camAnchor - parkFrom);
     // ease back a little with height, then stop: she has to stay readable at 2 km,
     // and at this fov she is already only a fifth of the frame on the ground
-    camZ += (8.8 + THREE.MathUtils.smoothstep(y, 12, 140) * 2.6 - camZ) * Math.min(1, dt * 2.2);
+    camZ += (8.8 + THREE.MathUtils.smoothstep(camY, 12, 140) * 2.6 - camZ) * Math.min(1, dt * 2.2);
     shake = Math.max(0, shake - dt * 2.4);
     flash = Math.max(0, flash - dt * 2.2);
     // The camera itself only twitches a little; the rest of the impact goes to the
@@ -631,15 +718,14 @@ export function createGame(stage) {
     // Thin air: the stage goes darker and the fog pulls in as the world below
     // stops reflecting anything. The sky colour comes from the world, which owns
     // the altitude bands, so the two can never disagree about what height this is.
-    const space = THREE.MathUtils.smoothstep(y, 60, 260);
+    const space = THREE.MathUtils.smoothstep(camY, 60, 260);
     if (world.skyColor) {
       scene.background.copy(world.skyColor);
       scene.fog.color.copy(world.skyColor);
     }
     // Haze is eye-measured, so the clear zone travels with the real distance to her,
     // which the yaw makes longer than camZ. She stays readable at any height; the world
-    // keeps dissolving behind her.
-    const eye = camZ / Math.cos(CAM_YAW);
+    // keeps dissolving behind her. `eye` is the one the framing measured above.
     scene.fog.near = eye + 1;
     scene.fog.far = eye + 14 - space * 5;
 
@@ -670,7 +756,7 @@ export function createGame(stage) {
       return {
         y, vy, grounded, skips: u.skips, ropes: u.ropes, alt: u.altMax,
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
-        holding, thrusting, down, paused, char: charId,
+        holding, thrusting, down, paused, char: charId, cam: camDbg,
         phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
       };
     },
@@ -683,8 +769,12 @@ export function createGame(stage) {
       },
       get: () => u,
       /** teleport: the sky bands and the star tier have to be checkable without
-       *  climbing 300 m first. Height only; everything else follows from camY. */
-      fly(m) { y = Math.max(0, m); vy = 0; },
+       *  climbing 300 m first. Height only; the parked frame goes with her, or the
+       *  picture would stay framed on the ground she left. */
+      fly(m) {
+        y = Math.max(0, m); vy = 0; grounded = false;
+        camAnchor = y; camY = y + 1.05;
+      },
     },
   };
 }

@@ -121,10 +121,16 @@ is what keeps it readable at any rope count or height:
   swap as she climbs, a cloud band that recycles around the camera, sky that fades to space
   with stars tiering in above it. All altitude-driven, and the sky colour it returns *is*
   the fog colour, so the two can never disagree about what height this is.
-- `game.js` — one-button physics, the level-up draft, camera. Vertical camera tracking is
-  near-rigid so a rocket climb can't walk her out of frame. Every run begins in
-  `startRun()`, which clears stats *and* the dead flag: a run that inherits the last one's
-  death cannot end, because `trip()` refuses to kill a run already marked dead.
+- `game.js` — one-button physics, the level-up draft, camera. The camera is *parked*: it sits
+  over a height, and nothing about a hop moves it. What moves it is the arc, guessed ahead of
+  time — the frame holds the range of heights that keep both the predicted apex and the
+  predicted landing inside the band her body, bob and rope hump need, and slides only when that
+  range stops containing it. An arc longer than the band, which is a long fall, leaves the range
+  empty: then the frame follows her outright rather than getting somewhere first. Prediction and
+  framing both read the same numbers the integrator does (`arcY`), so they cannot disagree about
+  where she is going. Every run begins in `startRun()`, which clears stats *and* the dead flag:
+  a run that inherits the last one's death cannot end, because `trip()` refuses to kill a run
+  already marked dead.
 - `audio.js` — synthesised: envelopes on oscillators plus filtered noise. No files.
 
 The only soft parts left are the bob strands and one body spring (`character.js:J`): blocks
@@ -165,6 +171,8 @@ her. Nothing you earn carries between runs.
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
 | `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |
+| `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
+| `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
@@ -176,6 +184,10 @@ her. Nothing you earn carries between runs.
 No build step and no test suite; behaviour was verified in a browser at 1024x707: title →
 roster → pick by key → run → level-up draft → card pick by key → trip → game over → restart,
 four jumpers, three ropes with fire, and 700 m frames driven through
-`window.game.script.fly()`. `window.game.debug` exposes live state (`y`, `vy`, `phase`,
-`skips`, `state`, `char`) and `window.game.script` drives input, grants cards and teleports,
-which is how those runs were driven.
+`window.game.script.fly()`. Framing was measured the same way, as her feet against the frame
+centre: eight plain hops with no cards moved the frame 1 cm in total, and a six-metre jump, a
+rocket climb and a 350 m fall each kept her inside the band the camera is parked for (-2.7 to
++0.85 m). `window.game.debug` exposes live state (`y`, `vy`, `phase`, `skips`, `state`, `char`)
+and `debug.cam` the frame's own decisions (`lo`, `hi`, `up`, `down`, `follow`, `a`);
+`window.game.script` drives input, grants cards and teleports, which is how those runs were
+driven.
