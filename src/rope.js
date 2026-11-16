@@ -15,7 +15,7 @@ const R = 0.08;         // rope thickness: at 240 rows this is a four-pixel band
                         // what survives the upscale; thinner reads as a hairline
 const BOW = 1.0;        // extra lateral spread aloft, added at the mid-rope
 const MAXR = 6;          // rope ceiling
-const LAG = Math.PI * 0.5; // phase step between ropes: a quarter turn, 0.25 s at the base cadence
+const LAG = Math.PI * 0.5; // preferred phase step between ropes: a quarter turn, 0.25 s a part
 const UP = new THREE.Vector3(0, 1, 0);
 const GQ = new THREE.Quaternion();
 
@@ -79,21 +79,25 @@ export function createRopes() {
 
   /** Keep n ropes live; spread their phases so each one asks for its own jump. */
   function setCount(n) {
+    // A quarter turn between ropes: 0.25 s at the base cadence, which sits inside one hop, so
+    // an added rope means more skips per jump instead of one thicker rope. Past three ropes a
+    // quarter turn would start wrapping the fourth and fifth onto the first one's beat, so the
+    // step tightens to what actually fits on the shaft - never two ropes on one instant.
+    const step = Math.min(LAG, (Math.PI * 2) / (n + 1));
     for (let i = 0; i < MAXR; i++) {
       const r = ropes[i];
       const was = r.active;
       r.active = i < n;
       r.beads.visible = r.active;
       r.radius = i * 0.055;
-      r.offset = i * LAG;
+      r.offset = i * step;
       // A rope that has been sitting inactive does not advance, so its own angle is from
       // the last reset and says nothing about where the sweep is now. Park a rope joining
-      // mid-run a quarter turn behind the one it joins, measured off that rope's live angle
-      // - otherwise it appears at the top of the arc whenever the card happened to be
-      // picked, which is either a free skip or an instant trip.
+      // mid-run behind the one it joins, measured off that rope's live angle - otherwise it
+      // appears at the top of the arc whenever the card happened to be picked, which is
+      // either a free skip or an instant trip.
       if (r.active && !was && i > 0) {
-        const prev = ropes[i - 1];
-        const abs = prev.theta + prev.offset - LAG;
+        const abs = ropes[i - 1].theta + ropes[i - 1].offset - step;
         r.theta = abs - r.offset;
         r.prevAbs = abs;
         r.crossed = false;
