@@ -120,7 +120,7 @@ is what keeps it readable at any rope count or height:
   Extra ropes lag a quarter turn (`LAG`) behind the one before them, so at one revolution a
   second the second rope arrives 0.25 s later - still inside the same hop, which is what makes
   a second rope mean more skips rather than one thicker rope. Past three ropes the step tightens
-  to whatever fits on the shaft without two of them sharing a beat. A rope joining mid-run is
+  so the last pass still lands inside one held hop (`HOP_SPAN`). A rope joining mid-run is
   parked off the live sweep, because its own angle froze at the last reset and would otherwise
   land it at the top of the arc whenever the card happened to be picked.
 - `world.js` - a dark stage that reads as one: a dusty floor slab, skyline silhouettes that
@@ -182,7 +182,7 @@ her. Nothing you earn carries between runs.
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
-| `rope.js` | `LAG` | preferred phase step between ropes: a quarter turn, tightened once they would overlap |
+| `rope.js` | `LAG`, `HOP_SPAN` | rope spacing: a quarter turn apart, tightened so every pass fits inside one held hop |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |

@@ -16,6 +16,8 @@ const R = 0.08;         // rope thickness: at 240 rows this is a four-pixel band
 const BOW = 1.0;        // extra lateral spread aloft, added at the mid-rope
 const MAXR = 6;          // rope ceiling
 const LAG = Math.PI * 0.5; // preferred phase step between ropes: a quarter turn, 0.25 s a part
+const HOP_SPAN = 0.7;     // turns of the sweep one fully held hop stays airborne (game.js JUMP_V,
+                          // HOLD_LIFT, HOLD_MAX): the span every rope has to fit inside
 const UP = new THREE.Vector3(0, 1, 0);
 const GQ = new THREE.Quaternion();
 
@@ -80,10 +82,10 @@ export function createRopes() {
   /** Keep n ropes live; spread their phases so each one asks for its own jump. */
   function setCount(n) {
     // A quarter turn between ropes: 0.25 s at the base cadence, which sits inside one hop, so
-    // an added rope means more skips per jump instead of one thicker rope. Past three ropes a
-    // quarter turn would start wrapping the fourth and fifth onto the first one's beat, so the
-    // step tightens to what actually fits on the shaft - never two ropes on one instant.
-    const step = Math.min(LAG, (Math.PI * 2) / (n + 1));
+    // an added rope means more skips per jump instead of one thicker rope, or a jump you have
+    // to survive in between. Past three ropes that spacing would stretch the last pass beyond
+    // the end of a held hop, so the step tightens to whatever still fits inside one hop.
+    const step = Math.min(LAG, (Math.PI * 2) * HOP_SPAN / Math.max(1, n - 1));
     for (let i = 0; i < MAXR; i++) {
       const r = ropes[i];
       const was = r.active;
