@@ -168,15 +168,25 @@ export function createGame(stage) {
   }
 
   // ---------------- flow ----------------
-  function startRun() {
-    // A new run has to start clean. Without this the last run's stats, pose and
-    // limp flag carried over - and trip() refuses to end a run that is already
-    // marked dead, so the second run of a session became unwinnable.
-    freshRun();
+  /** trip() writes the wipeout panel and copy, and nothing else puts them away,
+      so both entry points share this: pose, title copy, stats panel, camera. */
+  function resetScreen() {
     char.rig.hips.rotation.set(0, 0, 0);
     char.group.rotation.set(0, 0, 0);
     char.group.position.set(0, 0, 0);
+    el.title.innerHTML = 'BOING<span>GARDENS</span>';
+    el.tag.textContent = 'One button. One rope. Endless altitude.';
+    el.go.textContent = 'PRESS SPACE';
+    el.stats.style.display = 'none';
     camY = 0.9;
+  }
+
+  function startRun() {
+    // A new run has to start clean. Without this the last run's stats, pose, limp
+    // flag and wipeout panel carried over - trip() refuses to end a run already
+    // marked dead, and the panel kept reporting the previous run's score.
+    freshRun();
+    resetScreen();
     el.screen.classList.add('off');
     state = 'ready';
     hint('press to start the rope');
@@ -256,16 +266,9 @@ export function createGame(stage) {
 
   function resetRun() {
     freshRun();
-    char.rig.hips.rotation.set(0, 0, 0);
-    char.group.rotation.set(0, 0, 0);
-    char.group.position.set(0, 0, 0);
-    el.title.innerHTML = 'BOING<span>GARDENS</span>';
-    el.tag.textContent = 'One button. One rope. Endless altitude.';
-    el.go.textContent = 'PRESS SPACE';
-    el.stats.style.display = 'none';
+    resetScreen();
     el.screen.classList.remove('off');
     state = 'title';
-    camY = 0.9;
     hint('');
   }
 
@@ -483,7 +486,7 @@ export function createGame(stage) {
       return {
         y, vy, grounded, skips: u.skips, ropes: u.ropes, alt: u.altMax,
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
-        holding, thrusting,
+        holding, thrusting, down,
         phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
       };
     },
