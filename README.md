@@ -23,10 +23,16 @@ One button does everything: space / up / W / click / tap.
 | Release | let the arc fall                                         |
 | 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |
 | M       | mute                                                     |
+| P / Esc | pause, or resume                                           |
 
 A run ends when a rope reaches the bottom of its sweep while a foot is still on the dirt.
 With more than one rope a trip costs a rope instead of the run: the sweep restarts at
 the top and she stumble-hops back in, so the last rope is the one that ends it.
+
+A run also pauses itself when the tab or window loses focus, so an alt-tab or an
+app switch is never a wipeout. On a phone the pause button is the only way in and
+a tap anywhere is the way out; the press that lifts a pause never also jumps,
+because the sweep freezes wherever it happened to be.
 
 ### Phones
 

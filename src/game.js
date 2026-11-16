@@ -95,6 +95,7 @@ export function createGame(stage) {
     sAlt: document.getElementById('s-alt'),
     sBest: document.getElementById('s-best'),
     flash: document.getElementById('flash'),
+    paused: document.getElementById('paused'),
   };
 
   // ---------------- input mode ----------------
@@ -129,6 +130,7 @@ export function createGame(stage) {
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
     stumbled = false; hintT = 0; lostHint = false;
+    paused = false; el.paused.classList.remove('on');
     ropes.setCount(1);
     ropes.reset();
     renderOwned();
@@ -141,6 +143,7 @@ export function createGame(stage) {
   let pressEdge = false, down = false;
   let stumbled = false;        // a trip costs at most one rope per frame
   let hintT = 0, lostHint = false;   // the "ropes left" hint times itself out
+  let paused = false;        // freezes step() wholesale; see setPause
   let camY = 0.88, camZ = 7.8, time = 0, ropeBottom = 0.014, camDip = 0;
   const sDip = springState();
   const hands = [V3(), V3()];
@@ -327,12 +330,33 @@ export function createGame(stage) {
   // ---------------- input ----------------
   function press() {
     sfx.resume();
+    // The press that lifts a pause is not also a jump: the sweep freezes wherever
+    // it happened to be, so resuming has to be a beat to itself before the next
+    // one is due, rather than a hop at a rope position nobody chose.
+    if (paused) { setPause(false); return; }
     if (state === 'title' || state === 'over') { startRun(); return; }
     if (state === 'draft') return;
     down = true;
     pressEdge = true;
   }
   function release() { down = false; }
+
+  /** One early return in step() stops the physics, the sweep and every timer, so
+      a pause of any length resumes without a catch-up burst. Only a live run can
+      be paused - the title, the draft and the wipeout panel are already stopped. */
+  function setPause(on) {
+    if (paused === on) return;
+    if (!on) {
+      paused = false;
+      down = false; pressEdge = false;
+      el.paused.classList.remove('on');
+      return;
+    }
+    if (state !== 'run' && state !== 'ready') return;
+    paused = true;
+    el.paused.classList.add('on');
+  }
+  const togglePause = () => setPause(!paused);
 
   function pick(i) {
     if (state === 'draft') takeCard(i);
@@ -342,6 +366,7 @@ export function createGame(stage) {
   const camPos = new THREE.Vector3();
 
   function step(dt) {
+    if (paused) return;      // frozen: no physics, no sweep, no timers
     time += dt;
     stumbled = false;
     if (hintT > 0) {
@@ -545,13 +570,14 @@ export function createGame(stage) {
 
   return {
     renderer, scene, camera, step, resize, press, release, pick, setTouchUI,
+    setPause, togglePause,
     get state() { return state; },
     get rig() { return char.rig; },
     get debug() {
       return {
         y, vy, grounded, skips: u.skips, ropes: u.ropes, alt: u.altMax,
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
-        holding, thrusting, down,
+        holding, thrusting, down, paused,
         phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
       };
     },
