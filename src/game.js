@@ -10,20 +10,22 @@ import { sfx } from './audio.js';
 import { C, createPost } from './toon.js';
 
 const G = 23.5;              // gravity, m/s^2
-const JUMP_V = 5.75;         // base takeoff speed -> ~0.7m apex, ~0.49s airtime
-const HOLD_LIFT = 9.5;       // extra upward accel while holding on the way up
-const HOLD_MAX = 0.40;       // seconds of hold assist
+const JUMP_V = 3.8;          // a tap: ~0.31m apex, ~0.32s off the ground - over the sweep with a
+                             // little headroom, and back down with the revolution still running
+const HOLD_LIFT = 13.2;      // extra upward accel while holding, which is what turns that tap
+                             // into the ~0.70m hop a single press used to give on its own
+const HOLD_MAX = 0.40;       // seconds of hold assist: the held apex arrives as it runs out
 const CHAR_KEY = 'boing-gardens-char';
 const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
 const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
 const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
                                          // lands on the sweep, slower and the rope stops driving
 
-// The press that starts a run is also its first jump, so that one arc has to still
-// be airborne when the rope comes round: half a sweep for the rope to get from
-// overhead to her feet, and the base hop lands 0.01s short of that. Scaling the launch off
-// the base hop keeps it honest when the jump cards move.
-const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.18x
+// The press that starts a run is also its first jump, so that one arc has to still be airborne
+// when the rope comes round: half a sweep for the rope to get from overhead to her feet, and a
+// tap is off the ground for barely two thirds of that. Scaling the launch off the base hop keeps
+// it honest when the jump cards move.
+const LAUNCH = (G * Math.PI / (2 * BASE_SPEED) * 1.15) / JUMP_V;   // ~1.78x
 const BEST_KEY = 'boing-gardens-best';
 
 // Framing: a slight three-quarter view, not a flat lay. Dead-on, every box collapses to

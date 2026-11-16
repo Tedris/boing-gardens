@@ -174,7 +174,7 @@ her. Nothing you earn carries between runs.
 
 | Where | Knob | Effect |
 | ----- | ---- | ------ |
-| `game.js` | `JUMP_V`, `G` | airtime, and therefore the timing window |
+| `game.js` | `JUMP_V`, `HOLD_LIFT`, `HOLD_MAX` | tap height, what a held press adds to it, and when that apex arrives |
 | `game.js` | `BASE_SPEED` | sweep cadence: one revolution a second |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
