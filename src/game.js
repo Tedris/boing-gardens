@@ -29,14 +29,15 @@ export function createGame(stage) {
   const camera = new THREE.PerspectiveCamera(22, 1, 0.1, 1200);
   camera.position.set(0, 0.88, 7.8);
 
+  // One light. The directional pair had no effect at any intensity, and point
+  // lights parked far off had none either (the fire rope's light, a metre from
+  // her hands, does work). The cel read comes from two-tone part colours plus
+  // ink outlines, so this fill only has to stop her going flat - and it does,
+  // at every altitude.
   const hemi = new THREE.HemisphereLight(0xdff2ff, 0x8fbf72, 1.15);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff3d8, 1.5);
-  scene.add(sun, sun.target);
-  const rim = new THREE.DirectionalLight(0x9fd8ff, 0.5);
-  scene.add(rim);
-  // hemi ground colour: grass bounce at ground level, cold blue in space
-  const groundNear = new THREE.Color(0x8fbf72), groundSpace = new THREE.Color(0x223052);
+  // ground bounce: grass at park level, cold sky once the air thins out
+  const groundNear = new THREE.Color(0x8fbf72), groundSpace = new THREE.Color(0x6f89ad);
 
   // Contact shadow: one soft blob on the dirt that spreads and fades with height.
   // Cheaper and far more readable at this scale than a shadow map that would have
@@ -354,8 +355,15 @@ export function createGame(stage) {
 
     // ---------------- rope sweep + scoring ----------------
     if (state !== 'draft') {
+      // Matrices are only refreshed at draw time, so the hands are read from
+      // where she was last frame - nearly two metres down at 100+ m/s. Nudge
+      // them by the height gained since; cheaper and safer than forcing a
+      // matrix update halfway through the frame.
       char.hands[0].getWorldPosition(hands[0]);
       char.hands[1].getWorldPosition(hands[1]);
+      const dy = y - char.group.position.y;
+      hands[0].y += dy;
+      hands[1].y += dy;
       const speed = state === 'run' ? u.ropeSpeed * (1 + Math.min(0.35, u.time * 0.004)) : 0;
       ropeBottom = ropes.update(state === 'run' ? dt : 0, {
         hands, speed, length: ROPE_A, ground: 0, fire: u.fire > 0, time,
@@ -368,8 +376,12 @@ export function createGame(stage) {
           if (!r.active) continue;
           const abs = r.theta + r.offset;
           const c = Math.cos(abs);
-          const rb = Math.max((hands[0].y + hands[1].y) * 0.5 - (ROPE_A + r.radius), 0.014);
-          const clear = y > rb + 0.01;
+          // The rope rides her hands, so its geometric bottom climbs with the
+          // jump stretch and the arm swing - reading the pass/fail plane off it
+          // made a skip depend on her pose and on last frame's matrices. The
+          // player sees the rope sweep past her feet, so the plane follows her
+          // feet: off the floor when it passes is a skip, a foot down is a trip.
+          const clear = y > 0.03;
           if (r.crossed) {
             if (clear) {
               u.skips++;
@@ -386,7 +398,7 @@ export function createGame(stage) {
             } else {
               trip();
             }
-          } else if (c > Math.cos(w) && y < rb + 0.004 && vy <= 0.2) {
+          } else if (c > Math.cos(w) && y < 0.03 && vy <= 0.2) {
             // inside the danger window with a foot in the rope's path
             trip();
           }
@@ -433,21 +445,16 @@ export function createGame(stage) {
     camera.position.copy(camPos);
     camera.quaternion.identity();
 
-    // light rides the jumper so shadows hold at any altitude
-    sun.position.set(camPos.x - 4.5, camPos.y + 7.5, 5.5);
-    sun.target.position.set(0, camPos.y - 0.4, 0);
-    sun.target.updateMatrixWorld();
+    // nothing here needs to follow her: a hemisphere fill is the same anywhere
     const spread = 1 + Math.min(2.4, Math.max(0, y) * 0.09);
     blob.scale.set(spread, spread, 1);
     blob.material.opacity = Math.max(0, 0.5 - Math.max(0, y) * 0.035);
     blob.visible = blob.material.opacity > 0.01;
-    // thin air: almost nothing bounces, so the ambient drops and the unfiltered
-    // sun does the work. Left green she bakes; left dark blue she turns to mud.
+    // thin air: the grass stops bouncing off her underside, which is the entire
+    // difference between the park look and the space look. Left green, she bakes.
     const space = THREE.MathUtils.smoothstep(y, 60, 260);
-    hemi.intensity = 1.15 - space * 0.55;
+    hemi.intensity = 1.15 - space * 0.1;
     hemi.groundColor.lerpColors(groundNear, groundSpace, space);
-    sun.intensity = 1.5 + space * 1.1;
-    rim.intensity = 0.5 + space * 0.9;
 
     world.update(dt, time, camPos.y, u.fire > 0 ? 1 : 0);
     el.flash.style.opacity = flash * 0.55;
@@ -469,6 +476,7 @@ export function createGame(stage) {
       return {
         y, vy, grounded, skips: u.skips, ropes: u.ropes, alt: u.altMax,
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
+        holding, thrusting,
         phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
       };
     },

@@ -175,7 +175,7 @@ export function createWorld() {
   // three overlapping puffs each, or a recycled band of icosahedrons just looks
   // like floating white cookies
   const PUFFS = 3;
-  const NCLOUD = 30;
+  const NCLOUD = 46;
   const NC = NCLOUD * PUFFS;
   const SPAN = 230;
   const OFF = [[-0.55, -0.12, -0.2], [0.5, 0.08, 0.25], [0.05, 0.3, -0.5]];
@@ -186,9 +186,11 @@ export function createWorld() {
   const clouds = new THREE.InstancedMesh(puffGeo, toon(C.cloud, { steps: 2, flat: true, emissive: 0xdfe9ff, emissiveIntensity: 0.32 }), NC);
   const cloudInk = new THREE.InstancedMesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0x5b7fa6, side: THREE.BackSide }), NC);
   for (let c = 0; c < NCLOUD; c++) {
-    cbase[c * 3] = rand(-85, 85);
+    // stay inside the frustum corridor: spread wider or deeper than this and
+    // the band reads as empty blue, spread narrower and one lands on the lens
+    cbase[c * 3] = rand(-52, 52);
     cbase[c * 3 + 1] = rand(6, SPAN);
-    cbase[c * 3 + 2] = rand(-125, 10);
+    cbase[c * 3 + 2] = rand(-96, -18);
     cscale[c] = rand(1.5, 3.6);
   }
   group.add(clouds, cloudInk);

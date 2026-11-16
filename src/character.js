@@ -515,6 +515,9 @@ export function createCharacter() {
     p.size = 0.2 + Math.random() * 0.28;
     p.vx = (Math.random() - 0.5) * spread;
     p.vy = 0.35 + Math.random() * 0.5;
+    // sprites live in her group, so remember the world height: dust belongs to
+    // the dirt, and must not ride up with her on the next jump
+    p.wy = group.position.y + y;
     p.s.position.set(x, y, z);
     p.s.visible = true;
   }
@@ -640,7 +643,8 @@ export function createCharacter() {
       if (p.life <= 0) continue;
       p.life -= dt * 1.7;
       p.s.position.x += p.vx * dt;
-      p.s.position.y += p.vy * dt;
+      p.wy += p.vy * dt;
+      p.s.position.y = p.wy - group.position.y;
       p.s.scale.setScalar(p.size * (1.6 - p.life));
       p.s.material = puffMat;
       if (p.life <= 0) p.s.visible = false;
