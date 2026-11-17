@@ -1,5 +1,5 @@
 // Boot: canvas, fixed-step loop, one-button input.
-import { createGame } from './game.js';
+import { createGame, SLOT } from './game.js';
 import { sfx } from './audio.js';
 
 const stage = document.getElementById('stage');
@@ -19,8 +19,8 @@ addEventListener('keydown', (e) => {
   if (PRESS.has(e.code)) {
     e.preventDefault();
     if (!pressed) { pressed = true; game.press(); }
-  } else if (/^Digit[1-5]$/.test(e.code)) {
-    game.pick(+e.code.slice(5) - 1);
+  } else if (SLOT.includes(e.code)) {
+    game.pick(SLOT.indexOf(e.code));
   } else if (e.code === 'KeyM') {
     toggleMute();
   } else if (e.code === 'KeyP' || e.code === 'Escape') {

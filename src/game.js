@@ -9,7 +9,32 @@ import { ROSTER, byId } from './roster.js';
 import { sfx } from './audio.js';
 import { C, createPost } from './toon.js';
 
+// The key that takes each card on screen: the number row, then 0, then the key after it. Drawn
+// onto the cards and listened for in main.js from the same list, so a card can never claim a key
+// that does nothing. No card is capped, so a run stacked with Four-Leaf Sneaker can be handed the
+// whole deck at once and all eleven need a key.
+export const SLOT = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7',
+  'Digit8', 'Digit9', 'Digit0', 'Minus'];
+const KEY_LABEL = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'];
+
 const G = 23.5;              // gravity, m/s^2
+const VY_MAX = 26;           // ascent stops paying for itself here. Nothing in ordinary play comes
+                             // close - a tap leaves the ground at 3.8 - but thrust and fuel both
+                             // grow with every Propeller Braid, so the speed the climb ends at,
+                             // which is their product, grows with the square of the copies. Left
+                             // alone a deep braid stack leaves the atmosphere and the fall back
+                             // takes minutes of nothing happening.
+const ASCEND_DRAG = 20;      // how hard that ceiling is enforced: lift past VY_MAX is handed straight
+                             // back, which is what air does
+const FALL_DRAG_MIN = 0.35;  // the floor on Puffy Overalls' fall drag. Drag is reduced gravity on
+                             // the way down, and gravity is what makes the descent arrive: below a
+                             // third of it a hop hangs for seconds, she is still in the air when the
+                             // rope comes round, and the beat the whole game is solved against stops
+                             // being the thing she has to answer
+
+/** The ascent ceiling, stated once so the integrator and the camera's arc prediction cannot
+    disagree about it (game.js:arcY). Zero for anything a run reaches by skipping. */
+const ascendA = (v) => -ASCEND_DRAG * Math.max(0, v - VY_MAX);
 const JUMP_V = 3.8;          // a tap: ~0.31m apex, ~0.32s off the ground - over the sweep with a
                              // little headroom, and back down with the revolution still running
 const HOLD_LIFT = 13.2;      // extra upward accel while holding, which is what turns that tap
@@ -372,10 +397,13 @@ export function createGame(stage) {
         `<div class="ic">${c.icon}</div><div class="nm">${c.name}</div>` +
         `<div class="ds">${c.blurb}</div>` +
         `<div class="lv">${c.level(n + 1, u)}</div>` +
-        `<div class="key">PRESS ${i + 1}</div>`;
+        `<div class="key">PRESS ${KEY_LABEL[i] ?? i + 1}</div>`;
       d.onclick = () => takeCard(i);
       el.row.appendChild(d);
     });
+    // Past a handful the row wraps, and the blurbs are what would push the last row off the
+    // screen; the name, the number and the key are the parts that decide the pick.
+    el.row.classList.toggle('busy', offerCards.length > 5);
     el.draft.classList.add('on');
     el.skips.classList.add('hide');
     hint('');
@@ -443,7 +471,7 @@ export function createGame(stage) {
       d.innerHTML =
         `<div class="ic">${c.icon}</div><div class="nm">${c.name}</div>` +
         `<div class="ds">${c.blurb}</div>` +
-        `<div class="key">PRESS ${i + 1}</div>`;
+        `<div class="key">PRESS ${KEY_LABEL[i] ?? i + 1}</div>`;
       d.onclick = () => pickChar(i);
       el.pickRow.appendChild(d);
     });
@@ -546,11 +574,13 @@ export function createGame(stage) {
     const owed = Math.min(LOOK_AHEAD, Math.max(
       holding ? Math.max(0, u.holdMax - holdT) : 0,
       thrusting ? u.fuel * Math.max(0.2, u.fuelMax) : 0));
-    const g = -G * (vy < 0 ? u.fallDrag : 1);
-    if (t <= owed) return y + vy * t + 0.5 * (g + lift) * t * t;
-    const v = vy + (g + lift) * owed;
-    const h = y + vy * owed + 0.5 * (g + lift) * owed * owed;
-    return h + v * (t - owed) + 0.5 * g * (t - owed) * (t - owed);
+    const g = -G * (vy < 0 ? Math.max(FALL_DRAG_MIN, u.fallDrag) : 1);
+    const a1 = g + lift + ascendA(vy);
+    if (t <= owed) return y + vy * t + 0.5 * a1 * t * t;
+    const v = vy + a1 * owed;
+    const h = y + vy * owed + 0.5 * a1 * owed * owed;
+    const a2 = g + ascendA(v);
+    return h + v * (t - owed) + 0.5 * a2 * (t - owed) * (t - owed);
   }
 
   const SPAN = [0.2, 0.45, 0.75, 1.1, 1.5, 2];      // fractions of LOOK_AHEAD, sampled
@@ -614,9 +644,13 @@ export function createGame(stage) {
           sfx.boing(1);
           char.bump(0.9);
           char.puff(0, 0.05, 0.1, 0.7);
-        } else if (airLeft > 0) {
+        } else if (airLeft > 0 && vy < u.jumpV * 0.8) {
+          // A hop is a hop: it replaces the fall instead of adding to the hop before it. Summed,
+          // twenty copies of Second Wind and a mashing thumb made an ascent no descent can come
+          // back down from - tens of thousands of metres, and a fall that outlasts the run. A
+          // press while she is still rising from the last one takes nothing, so it spends nothing.
           airLeft--;
-          vy = Math.max(vy, 0) + u.jumpV * 0.8;
+          vy = u.jumpV * 0.8;
           sfx.whoosh();
           char.bump(0.7);
         }
@@ -627,12 +661,13 @@ export function createGame(stage) {
       if (holding) holdT += dt;
       if (thrusting) u.fuel = Math.max(0, u.fuel - dt / Math.max(0.2, u.fuelMax));
 
-      let a = -G * (vy < 0 ? u.fallDrag : 1);
+      let a = -G * (vy < 0 ? Math.max(FALL_DRAG_MIN, u.fallDrag) : 1);
       // The opening hop spends its assist here, so a held press and the press that started the
       // run get one assist window each, never two stacked on the same arc.
       if (launchT > 0 && !grounded) { a += u.holdLift; launchT = Math.max(0, launchT - dt) }
       else if (holding) a += u.holdLift;
       if (thrusting) a += u.thrust;
+      a += ascendA(vy);
       vy += a * dt;
       y += vy * dt;
 

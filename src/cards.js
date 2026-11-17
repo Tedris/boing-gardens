@@ -1,6 +1,10 @@
 // Eleven upgrade cards. Each one edits the same run parameters the physics loop
 // reads, so stacking is just multiplication on shared state - no per-card hooks
-// scattered through the engine.
+// scattered through the engine. Nothing here is capped: a card is on offer however
+// many copies the run has already taken, and the only ceiling is the arithmetic of
+// the parameter it moves - a probability cannot pass 100%, a draw cannot offer more
+// cards than the deck holds, and gravity has a floor below which the descent stops
+// arriving on the beat (game.js:FALL_DRAG_MIN).
 
 /** What every counted skip rolls for double XP with no Crit Caliper owned. The roll itself is in
     the skip path (game.js), and the card below only ever moves this number. */
@@ -34,23 +38,23 @@ export const CARDS = [
   {
     id: 'braid', icon: '\u{1F300}', name: 'Propeller Braid', tier: 3,
     blurb: 'Wind the braid overhead and hold to climb. It spins back up the moment she lands.',
-    max: 4,
     apply: (u) => { u.thrust += 6.5; u.fuelMax += 0.7; u.fuel = u.fuelMax; },
     level: (n) => `LIFT ${n}`,
   },
   {
     id: 'live', icon: '\u{1F50C}', name: 'Live Wire', tier: 3,
     blurb: 'The ropes turn live. Everything they touch scores double, and a trip is a shock.',
-    max: 3,
-    apply: (u) => { u.live = Math.min(3, u.live + 1); u.mult *= 2; },
+    apply: (u) => { u.live += 1; u.mult *= 2; },
     level: (n) => `\u00D7${Math.pow(2, n)} SCORE`,
   },
   {
     id: 'sneaker', icon: '\u{1F340}', name: 'Four-Leaf Sneaker', tier: 2,
     blurb: 'Better draws. One more card to choose from at each level.',
-    max: 2,
-    apply: (u) => { u.offer = Math.min(5, u.offer + 1); },
-    level: (n) => `${3 + n} CHOICES`,
+    // The draw cannot hand over more cards than the deck has, so past the eleventh copy this one
+    // has already given everything it has. The label says what the screen will show, not what was
+    // asked for.
+    apply: (u) => { u.offer += 1; },
+    level: (n) => `${Math.min(3 + n, CARDS.length)} CHOICES`,
   },
   {
     id: 'chute', icon: '\u{1FA82}', name: 'Puffy Overalls', tier: 1,
@@ -60,22 +64,20 @@ export const CARDS = [
   },
   {
     id: 'grace', icon: '\u{1FA9B}', name: 'Sticky Soles', tier: 1,
-    blurb: 'Grippy shoes. The rope brushes past instead of tripping you.',
-    max: 3,
+    blurb: 'Grippy shoes. The rope brushes past instead of tripping you. Narrowing stops when the '
+      + 'rope has a moment left at the feet.',
     apply: (u) => { u.grace += 0.12; },
     level: (n) => `WINDOW +${Math.round(n * 12)}%`,
   },
   {
     id: 'wind', icon: '\u{1F98B}', name: 'Second Wind', tier: 2,
     blurb: 'Press again in mid-air for one extra hop.',
-    max: 3,
     apply: (u) => { u.airJumps += 1; },
     level: (n) => `${n} MID-AIR HOPS`,
   },
   {
     id: 'crown', icon: '\u{1F451}', name: 'Combo Crown', tier: 2,
     blurb: 'A long run pays. The multiplier climbs with every skip you survive.',
-    max: 4,
     apply: (u) => { u.combo += 1; },
     level: (n) => `+${(n * 0.35).toFixed(2)} / SKIP`,
   },
@@ -86,9 +88,9 @@ export const CARDS = [
     id: 'crit', icon: '\u{1F3AF}', name: 'Crit Caliper', tier: 1,
     blurb: 'Any skip can catch: a lucky one pays double experience. This widens the chance it '
       + 'lands on a given skip.',
-    max: 4,
+    // Past nine copies the roll is already certain; the number stops rather than claiming 140%.
     apply: (u) => { u.critChance += CRIT_STEP; },
-    level: (n) => `${Math.round((CRIT_BASE + CRIT_STEP * n) * 100)}% CRIT`,
+    level: (n) => `${Math.round(Math.min(1, CRIT_BASE + CRIT_STEP * n) * 100)}% CRIT`,
     tags: ['xp'],
   },
 ];

@@ -185,8 +185,13 @@
     font-size:12px;font-weight:500;letter-spacing:.36em;text-transform:uppercase;
     color:var(--label);white-space:nowrap;
   }
-  #draft .row,#pick .row{display:flex;gap:14px;align-items:stretch}
-  /* the roster is four wide where the draft is three */
+  /* Nothing caps the draw, so this row carries three cards or eleven: it wraps, and the cards are
+     sized by a share of the viewport so a full deck lands in two rows instead of off the screen. */
+  #draft .row,#pick .row{
+    display:flex;flex-wrap:wrap;justify-content:center;gap:14px;align-items:stretch;
+    max-width:min(96vw,1500px);
+  }
+  /* the roster is four wide where the draft is usually three */
   #pick .card{width:min(20vw,196px)}
   .card{
     width:min(23vw,224px);padding:18px 16px 16px;
@@ -203,6 +208,10 @@
     font-size:10px;letter-spacing:.18em;color:var(--accent);
   }
   .card .key{margin-top:10px;font-size:10px;letter-spacing:.2em;color:var(--label)}
+  /* a crowded row keeps the name, the number and the key, which are what decide the pick */
+  .row.busy .card{width:min(13vw,150px);padding:14px 12px 12px}
+  .row.busy .ds{display:none}
+  .row.busy .nm{font-size:13px;margin:10px 0 6px}
   #draft .foot,#pick .foot{
     position:absolute;bottom:7vh;left:50%;transform:translateX(-50%);
     font-size:10px;letter-spacing:.22em;color:var(--label);white-space:nowrap;
@@ -387,7 +396,7 @@
   <div id="draft">
     <h2>LEVEL UP</h2>
     <div class="row"></div>
-    <div class="foot"><span class="kbd">CLICK A CARD &nbsp;·&nbsp; OR PRESS 1 / 2 / 3</span><span class="tch">TAP A CARD</span></div>
+    <div class="foot"><span class="kbd">CLICK A CARD &nbsp;·&nbsp; OR PRESS THE NUMBER ON ONE</span><span class="tch">TAP A CARD</span></div>
   </div>
 
   <div id="screen">
@@ -418,7 +427,7 @@
     <h2>PICK A JUMPER</h2>
     <div class="row"></div>
     <div class="foot">NOW JUMPING <b id="pick-name">Boing</b>
-      &nbsp;·&nbsp; <span class="kbd">OR PRESS 1 / 2 / 3 / 4 &nbsp;·&nbsp; C SWAPS</span><span class="tch">TAP ONE &nbsp;·&nbsp; THE SWAP BUTTON CHANGES</span></div>
+      &nbsp;·&nbsp; <span class="kbd">OR PRESS THE NUMBER ON ONE &nbsp;·&nbsp; C SWAPS</span><span class="tch">TAP ONE &nbsp;·&nbsp; THE SWAP BUTTON CHANGES</span></div>
   </div>
 
   <div id="paused"><div><b>PAUSED</b><p><span class="kbd">PRESS P OR SPACE</span><span class="tch">TAP ANYWHERE</span></p></div></div>

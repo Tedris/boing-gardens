@@ -193,11 +193,15 @@ one skip in ten pays double (`cards.js:CRIT_BASE`) and any skip that counts can 
 the label flying off the counter is the only tell that luck just landed. Crit Caliper is the one
 card that pays in experience instead of height, speed or survival, and it buys the chance and not
 the payout - four of them make it every other skip.
-Each level offers three randomly drawn cards from eleven, and you keep one. Cards stack: jump
-height, extra ropes, rope speed, a propeller braid, live wires, better draws, slower falls,
-wider timing, a mid-air hop, a running multiplier, and the crit chance. Rope speed is on that list
-and nowhere else: the sweep holds three revolutions every four seconds for the whole run, so the
-timing learned on the first jump is still true at minute nine.
+Each level offers three randomly drawn cards from eleven, and you keep one. No card is capped, so
+the same one can come round as often as the picks hand it out and a build can go as deep into any
+of them as it likes. Cards stack: jump height, extra ropes, rope speed, a propeller braid, live
+wires, better draws, slower falls, wider timing, a mid-air hop, a running multiplier, and the crit
+chance. Rope speed is on that list and nowhere else: the sweep holds three revolutions every four
+seconds for the whole run, so the timing learned on the first jump is still true at minute nine.
+A better draw is the one card whose effect the deck bounds - past eight copies of it there is
+nothing left to offer - and at that point the draft puts the whole eleven on screen in two rows,
+keyed 1 to 9, then 0, then -, because every card on the screen has to have a key of its own.
 
 Two gauges, deliberately unlike each other, because they answer different questions. The
 experience ladder runs along the bottom in rose and only exists while she is jumping: it is the
@@ -242,6 +246,8 @@ changes how a wipeout looks, which is the whole cost.
 | `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
+| `game.js` | `VY_MAX`, `ASCEND_DRAG` | the speed a climb tops out at, and how hard the air takes the excess back |
+| `game.js` | `FALL_DRAG_MIN` | how slow a fall may be slowed to, which is what keeps the descent arriving on the beat |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
 | `rope.js` | `WHIP` | how far the sweep hangs aloft before it snaps past the feet |
 | `rope.js` | `BUNDLE` | the span of time the group passes inside: one tap's worth of air |
@@ -291,7 +297,8 @@ The crit roll was read with the chance pinned at each end: 25 skips paid 25 XP a
 50 at a chance of 1, so a crit pays exactly double and nothing else moves. At the shipped 0.10 the
 same player banked 216 XP over 200 skips, 1.08 a skip against the 1.10 expected. Taking Crit
 Caliper off the draft took the run parameter from 0.10 to 0.20, and the card's own label reads the
-chance it hands over - 20% CRIT on the first copy, 50% on the fourth.
+chance it hands over - 20% CRIT on the first copy, 50% on the fourth, and a certain 100% from the
+ninth, because a probability cannot be stacked past certain.
 
 The slower cadence was checked against the hop rather than against itself: the opening press leaves
 her airborne from frame 2 to 39, and the first pass now lands on frame 29, so the launch arc clears
@@ -304,12 +311,32 @@ spaced in seconds does not care what a turn costs.
 Rope accounting was read through an actual trip rather than a scripted number: six ropes bought one
 pick at a time, then left alone until the sweep took three of them, which the readout reported as
 `3/6` and the run carried on with three turning. The next Another Rope made it four and left the
-high-water mark at six. With all five copies already owned and four ropes turning, the draft still
+high-water mark at six. With ten copies already owned and four ropes turning, the draft still
 handed the card over - labelled 5 ROPES, the count it hands over rather than the copies spent - and
 taking it restored one.
 
 With ten ropes turning, 400 draws filled three cards every time and offered Another Rope among
 them, since nothing gates it any more.
+
+Caps came off every card, which moved the limits from the cards to the arithmetic. Twenty copies of
+each one were stacked on a fresh run and the button was mashed - a press edge on every frame, five
+seconds of it - and nothing produced a NaN or an error, or a run the player could not finish. What
+that took was two numbers, not two ceilings on cards. Ascent stops paying above 26 m/s (`VY_MAX`,
+handed straight back as drag by `ASCEND_DRAG`, and stated once so the integrator and the camera's
+arc prediction cannot disagree about it), because thrust and fuel both grow with every Propeller
+Braid and their product is the speed a climb ends at: twenty of them climbed 153 m under mashing
+and were back on the dirt 297 frames after the mashing stopped, and twelve of everything peaked at
+191 m and came down in 8 s. And a mid-air hop replaces the fall instead of adding to it - summed,
+twenty Second Winds left the ground at 74 m/s, which is tens of thousands of metres in a run and a
+descent that outlasts it. Ordinary play never reaches either term: a mid-run tap still peaks at
+0.311 m and is off the ground for 0.317 s, and turns still measure 80 frames.
+
+What the deck does bound is the draw. With Four-Leaf Sneaker taken past eight copies the draft has
+nothing left to add, so it shows all eleven cards in two wrapped rows keyed 1 to 9, then 0, then -;
+each of those keys was pressed against a draft and took the card drawn in its own slot, and pressing
+a key past the cards on screen takes nothing. Two footers had been naming their keys by hand and
+said `1 / 2 / 3` next to four cards, and `1 / 2 / 3 / 4` under a roster of five jumpers: both now
+point at the number on the card.
 
 Deep bundles were measured rather than assumed, by handing a run ropes past the old ceiling and
 hopping on the beat. The pool took all of them - 20, 30, 40 turning, none dropped or duplicated -
