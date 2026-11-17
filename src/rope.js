@@ -19,6 +19,13 @@ const BOW = 1.35;       // extra lateral spread aloft, added at the mid-rope. It
                         // the ends of the arc are pinned to the handles.
 const MAXR = 6;          // rope ceiling
 const LAG = Math.PI * 0.5; // preferred phase step between ropes: a quarter turn, 0.25 s a part
+const JOIN_GRACE = 1.0;    // turns a rope that has just joined cannot end a run. A rope picked
+                           // up mid-sweep arrives inside a rhythm that is already working, and
+                           // its first pass is the one that ends the run most often; a turn to
+                           // hear where it falls is the whole fix.
+const BACK_GRACE = 0.5;    // turns the survivors get when a rope is lost under them: that
+                           // stumble re-spaces the sweep, and a rhythm nobody asked to change
+                           // should not cost a second rope either.
 const HOP_SPAN = 0.61;    // turns of the sweep one fully held hop stays airborne, measured on the
                           // build (game.js JUMP_V, HOLD_LIFT, HOLD_MAX): the span every rope has
                           // to fit inside
@@ -44,6 +51,9 @@ export function createRopes() {
   const segGeo = new THREE.BoxGeometry(1, 1, 1);
   const plain = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
   const burning = new THREE.MeshBasicMaterial({ color: C.fire, fog: false });
+  // a rope that is still finding its place in the sweep, drawn faint so it is obvious which
+  // one you are being let off
+  const warming = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0.45 });
 
   const ropes = [];
   const dummy = new THREE.Object3D();
@@ -62,7 +72,7 @@ export function createRopes() {
     group.add(segs);
     ropes.push({
       theta: Math.PI, prevAbs: Math.PI, beads: segs, active: i === 0,
-      radius: 0, offset: 0, crossed: false,
+      radius: 0, offset: 0, crossed: false, grace: 0,
     });
   }
 
@@ -107,6 +117,7 @@ export function createRopes() {
         r.theta = abs - r.offset;
         r.prevAbs = abs;
         r.crossed = false;
+        r.grace = JOIN_GRACE;
       }
     }
   }
@@ -176,8 +187,11 @@ export function createRopes() {
         // would report its crossing a different instant than its geometry crosses
         r.crossed = Math.floor(theta / (Math.PI * 2)) > Math.floor(r.prevAbs / (Math.PI * 2));
 
+        // grace counts turns, not seconds: a fast sweep and a slow one offer the same number
+        // of passes to learn where the rope falls
+        if (r.grace > 0) r.grace -= (speed * dt) / (Math.PI * 2);
         const lit = !!s.fire;
-        r.beads.material = lit ? burning : plain;
+        r.beads.material = lit ? burning : (r.grace > 0 ? warming : plain);
         if (lit) {
           anyFire = true;
           // shed embers from the low front of the arc
@@ -215,12 +229,15 @@ export function createRopes() {
      * next jump is half a revolution away. The rest keep their quarter-turn lag rather than
      * being collapsed onto it - collapsed is what a restart after losing a rope would give,
      * and surviving ropes all arriving in the same instant is one wide rope, not a fair sweep.
+     * `recovering` is that restart, and it gives the survivors BACK_GRACE: the sweep they are
+     * re-spaced into is not the rhythm they were being swept in.
      */
-    reset() {
+    reset(recovering) {
       for (const r of ropes) {
         r.theta = Math.PI - 2 * r.offset;   // abs = theta + offset = PI - offset
         r.prevAbs = Math.PI - r.offset;
         r.crossed = false;
+        r.grace = recovering ? BACK_GRACE : 0;
       }
     },
   };

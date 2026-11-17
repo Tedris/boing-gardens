@@ -261,7 +261,7 @@ export function createGame(stage) {
   function loseRope() {
     u.ropes--;
     ropes.setCount(u.ropes);
-    ropes.reset();
+    ropes.reset(true);      // recovering: the survivors are re-spaced, so they get a half turn
     vy = STUMBLE_VY; grounded = false; holdT = 0; thrusting = false;
     shake = 0.8; flash = 0.35;
     char.bump(-1.4, 0.5);
@@ -619,6 +619,10 @@ export function createGame(stage) {
           // player sees the rope sweep past her feet, so the plane follows her
           // feet: off the floor when it passes is a skip, a foot down is a trip.
           const clear = y > 0.03;
+          // A rope still inside its grace turn cannot end the run. It is the one the player
+          // has not heard yet, and before this it arrived, tripped her out of a rhythm that
+          // was working, and was gone inside a second of being picked up.
+          const safe = r.grace > 0;
           if (r.crossed) {
             if (clear) {
               u.skips++;
@@ -632,10 +636,10 @@ export function createGame(stage) {
               el.skips.classList.add('pop');
               setTimeout(() => el.skips.classList.remove('pop'), 90);
               if (u.skips >= u.xpNeed) { levelUp(); break; }
-            } else {
+            } else if (!safe) {
               trip();
             }
-          } else if (c > Math.cos(w) && y < 0.03 && vy <= 0.2) {
+          } else if (!safe && c > Math.cos(w) && y < 0.03 && vy <= 0.2) {
             // inside the danger window with a foot in the rope's path
             trip();
           }
@@ -778,6 +782,7 @@ export function createGame(stage) {
         // cannot derive them from the offsets, because a reset parks a rope at PI - offset
         // rather than PI + offset (rope.js:reset).
         phases: ropes.ropes.filter((r) => r.active).map((r) => r.theta + r.offset),
+        grace: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.grace * 100) / 100),
       };
     },
     /** drive the game from a script (used for automated checks) */
