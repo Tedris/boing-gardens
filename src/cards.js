@@ -1,8 +1,6 @@
 // Eleven upgrade cards. Each one edits the same run parameters the physics loop
 // reads, so stacking is just multiplication on shared state - no per-card hooks
-// scattered through the engine. One card declares `available`, because for it the
-// question is the run's state rather than how many copies have been spent.
-import { MAX as MAX_ROPES } from './rope.js';   // the rope ceiling lives with the ropes
+// scattered through the engine.
 
 /** What every counted skip rolls for double XP with no Crit Caliper owned. The roll itself is in
     the skip path (game.js), and the card below only ever moves this number. */
@@ -19,11 +17,10 @@ export const CARDS = [
     id: 'rope', icon: '\u{1FAA2}', name: 'Another Rope', tier: 2,
     blurb: 'One more rope, offset from the others. More skips per sweep; a trip costs one. '
       + 'Take it again to replace one you have lost.',
-    // Availability is a question about the ropes, not about how many of these cards have been
-    // taken: a trip takes a rope and the run goes on with fewer, so the card has to stay on offer
-    // while a rope can still be added. The ceiling is the bundle's, not the card's (rope.js:MAX).
-    available: (u) => u.ropes < MAX_ROPES,
-    apply: (u) => { u.ropes = Math.min(MAX_ROPES, u.ropes + 1); },
+    // No ceiling and no copy limit: a trip takes a rope and the run goes on with fewer, so the
+    // card has to be worth taking again however deep into the run that happens. What keeps the
+    // group honest is the spacing, not the count (rope.js:BUNDLE, GAP_MIN).
+    apply: (u) => { u.ropes += 1; },
     // The number is the count in play plus one, not the copies spent: those two part company the
     // first time a rope is lost, and the hand should say what it hands over.
     level: (n, u) => `${u.ropes + 1} ROPES`,
@@ -98,7 +95,7 @@ export const CARDS = [
 
 /** Draw `n` distinct cards, weighted so a build trends instead of stalling. */
 export function drawCards(u, n, rng = Math.random) {
-  const pool = CARDS.filter((c) => (c.available ? c.available(u) : !c.max || (u.levels[c.id] ?? 0) < c.max));
+  const pool = CARDS.filter((c) => !c.max || (u.levels[c.id] ?? 0) < c.max);
   const out = [];
   const weight = (c) => {
     const lvl = u.levels[c.id] ?? 0;

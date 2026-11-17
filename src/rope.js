@@ -17,8 +17,10 @@ const BOW = 1.35;       // extra lateral spread aloft, added at the mid-rope. It
                         // quarter-points of the loop out past the handle line; most of the
                         // loop's width is the hand spread itself (character.js handX), since
                         // the ends of the arc are pinned to the handles.
-export const MAX = 6;    // rope ceiling, and the only one: the bundle is spaced across this many,
-                         // and cards.js stops offering Another Rope once this many are turning
+const GAP_MIN = 1 / 60;    // never squeeze two ropes into the same frame: once the bundle's own
+                           // spacing would land two of them on one instant, the group spreads
+                           // wider instead of merging back into the one wide rope this file exists
+                           // to avoid
 const WHIP = 0.42;       // how far the sweep hangs overhead and then snaps through the bottom. The
                          // rope's geometric angle is the hand clock warped by WHIP*sin(clock): it
                          // dwells at the top where it can be read, arrives fast, and spends less
@@ -84,20 +86,25 @@ export function createRopes() {
   const pts = [];
   for (let i = 0; i <= K; i++) pts.push(new THREE.Vector3());
 
-  for (let i = 0; i < MAX; i++) {
+  /** One rope's worth of geometry, allocated the first time a run asks for that many. There is no
+      ceiling to build up to: the pool grows with the run, and a rope nobody has bought is never
+      constructed. */
+  function add() {
+    const i = ropes.length;
     const segs = new THREE.InstancedMesh(segGeo, plain, K);
     segs.frustumCulled = false;
     const [a, b] = PAIRS[i % PAIRS.length];
     const ca = new THREE.Color(a), cb = new THREE.Color(b);
     for (let k = 0; k < K; k++) segs.setColorAt(k, k % 2 ? ca : cb);
     if (segs.instanceColor) segs.instanceColor.needsUpdate = true;
-
     group.add(segs);
     ropes.push({
-      theta: Math.PI, abs: Math.PI, prevAbs: Math.PI, beads: segs, active: i === 0,
+      theta: Math.PI, abs: Math.PI, prevAbs: Math.PI, beads: segs, active: false,
       radius: 0, offset: 0, crossed: false, settle: 0,
     });
   }
+  add();
+  ropes[0].active = true;
 
   // sparks thrown by a live rope: ordinary squares, no additive blending, because additive
   // light washes out the dither pattern they would be sitting on. They are the only thing that
@@ -126,19 +133,26 @@ export function createRopes() {
   let turn = 1;          // seconds per turn, read off the speed the sweep runs at: this is what
                          // converts the bundle's seconds into radians
 
-  /** Keep n ropes running; bundle their offsets so the group is one hop's worth of passes. */
+  /** Keep n ropes running, building any the pool has not needed before, and bundle their offsets
+      so the group is one hop's worth of passes. */
   function setCount(n) {
+    while (ropes.length < n) add();
     // One bundle rather than a queue: every rope in the group passes inside a single tap, so a
-    // rope picked up is more skips per hop instead of a second rhythm to survive. The step is
-    // what keeps the passes apart as stripes rather than one thick rope, and it tightens as the
-    // group grows so the span between the first and the last pass stays BUNDLE whatever n is.
-    const step = (Math.PI * 2) * BUNDLE / turn / Math.max(1, n - 1);
-    for (let i = 0; i < MAX; i++) {
+    // rope picked up is more skips per hop instead of a second rhythm to survive. The gap between
+    // neighbours holds the span at BUNDLE as the group grows, down to the point where two of them
+    // would land on the same frame; past that the bundle widens rather than merging into one
+    // instant, because a hop that has to be held is a fair price and an unreadable rope is not.
+    const gap = Math.max(BUNDLE / Math.max(1, n - 1), GAP_MIN);
+    const step = (Math.PI * 2) * gap / turn;
+    // The fan of radii keeps its width rather than its spacing, so twenty ropes are a tight braid
+    // instead of a balloon. Up to seven the step is what it has always been.
+    const fan = Math.min(0.055, 0.33 / Math.max(1, n - 1));
+    for (let i = 0; i < ropes.length; i++) {
       const r = ropes[i];
       const was = r.active;
       r.active = i < n;
       r.beads.visible = r.active;
-      r.radius = i * 0.055;
+      r.radius = i * fan;
       r.offset = i * step;
       r.theta = clock;
       r.abs = warp(clock + r.offset);

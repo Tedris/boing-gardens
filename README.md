@@ -36,13 +36,13 @@ in should not end the run before you have heard where the rope falls. A settling
 faint, so it is obvious which one you are being let off.
 
 The rope count is kept two ways: how many are turning, and the most the run has had. The right-edge
-readout shows `3/6` while the run is under its own high-water mark, so a lost rope stays visible
-after the toast has gone, and Another Rope stays in the draft while a rope can still be added. The
-ceiling is the six the bundle is spaced across (`rope.js:MAX`) rather than a count of cards, which
-is what makes the card worth taking after a bad patch instead of something you had spent your way
-out of. The reference publishes no ceiling at all - the store copy says only that a card adds a
-rope, and a player reported carrying past seventy in one run - so six is this build's own choice,
-and it is the most that still reads as separate stripes rather than one wide rope.
+readout shows `3/12` while the run is under its own high-water mark, so a lost rope stays visible
+after the toast has gone, and Another Rope never leaves the draft - a run can be back down to one
+rope after a bad patch and that card is still the way out. There is no ceiling on the count and the
+pool builds a rope the first time a run asks for one; the reference publishes none either, the
+store copy saying only that a card adds a rope while a player reported carrying past seventy in one
+run. What holds a deep build down is the bundle's own arithmetic, in the next section, rather than
+a number anyone typed in.
 
 What a wipeout looks like is drawn on the spot - a crumple, a topple, a sit - so the same
 mistake does not look the same twice, and each one ends with her settled where she fell instead
@@ -153,10 +153,12 @@ is what keeps it readable at any rope count or height:
   inertia instead of a stutter.
   All the ropes turn one shared clock and differ only by their offset, which holds the whole group
   inside `BUNDLE` - 0.23 s of real time, one tap's worth of air, spaced against the current turn so
-  a faster sweep does not squeeze the stripes together, and a rope picked up is more skips per
-  hop and never a second rhythm to survive. Six ropes cross inside 233 ms end to end and pay six
-  skips for one hop. A rope joining mid-run needs no parking, only the turn of immunity it cannot
-  have earned yet. A fresh run also parks the sweep a quarter turn past the top
+  a faster sweep does not squeeze the stripes together. The spacing stops compressing at one frame
+  between neighbours (`GAP_MIN`, about fifteen ropes), and from there the bundle widens instead of
+  two ropes landing on one instant: twenty cross inside 300 ms and pay twenty skips for one hop,
+  thirty take 450 ms and a tap pays 23 of them, because the hop is a fall and does not stretch
+  because the group grew. A rope joining mid-run needs no parking, only the turn of immunity it
+  cannot have earned yet. A fresh run also parks the sweep a quarter turn past the top
   (`rope.js:AT_START`) so the first pass lands under the launch arc the opening press doubles as.
 - `world.js` - a dark stage that reads as one: a dusty floor slab, skyline silhouettes that
   swap as she climbs, a cloud band that recycles around the camera, sky that fades to space
@@ -245,7 +247,7 @@ changes how a wipeout looks, which is the whole cost.
 | `rope.js` | `BUNDLE` | the span of time the group passes inside: one tap's worth of air |
 | `rope.js` | `AT_START` | where the sweep waits between runs, which sets how long the opening arc has to be |
 | `rope.js` | `JOIN_SETTLE`, `BACK_SETTLE` | turns a new rope, or a rope that survived a loss, cannot end the run |
-| `rope.js` | `MAX` | the rope ceiling: how many the bundle is spaced across, and where Another Rope stops being offered |
+| `rope.js` | `GAP_MIN` | the tightest the bundle may pack its ropes: one frame per neighbour, past which the group widens |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the eleven upgrades and their numbers |
@@ -304,5 +306,20 @@ pick at a time, then left alone until the sweep took three of them, which the re
 `3/6` and the run carried on with three turning. The next Another Rope made it four and left the
 high-water mark at six. With all five copies already owned and four ropes turning, the draft still
 handed the card over - labelled 5 ROPES, the count it hands over rather than the copies spent - and
-taking it restored one. At six turning, 400 draws never offered it, and still filled three cards
-every time.
+taking it restored one.
+
+With ten ropes turning, 400 draws filled three cards every time and offered Another Rope among
+them, since nothing gates it any more.
+
+Deep bundles were measured rather than assumed, by handing a run ropes past the old ceiling and
+hopping on the beat. The pool took all of them - 20, 30, 40 turning, none dropped or duplicated -
+and the frame cost did not move: 17 ms median, 18 at the 95th percentile with thirty ropes, the
+same as with one, because a rope is one instanced draw call. What bends is the spacing. Six ropes
+still cross inside 233 ms end to end; twenty need 300 ms, thirty 450 ms, forty 533 ms, because
+`GAP_MIN` refuses to land two of them on the same frame and the bundle widens instead. A tap stays
+0.32 s as it grows, so past about twenty a tap stops covering the group: measured with thirty ropes
+turning, one hop paid 23 of the 30 skips and the rest arrived under her feet and cost ropes, which
+is the pressure the removed ceiling used to supply and why a deep build is a build that has to hold
+its hops. Readability goes the same way in the picture rather than in the numbers - at six the
+sweep reads as nested stripes, at ten and past it is a solid shell around her, and the count on the
+right is what says how many are in it.
