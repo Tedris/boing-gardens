@@ -137,15 +137,18 @@ is what keeps it readable at any rope count or height:
   adds the height gained since the last frame before asking where they are - at 100 m/s
   that is a two-metre error otherwise.
   It does not turn evenly: the rope's angle is the hand clock warped by `WHIP*sin(clock)`, so
-  the sweep hangs overhead where it can be read - 60% of the descent instead of 50% - and then
-  snaps past the feet, which cuts the threat window from 117 ms to 83 ms. The beat is untouched:
-  a pass still lands on the same instant, and the hands keep the unwrapped clock, which is what
-  makes the whip read as the rope's inertia instead of a stutter.
-  All the ropes turn one shared clock and differ only by their offset, which holds the whole
-  group inside `BUNDLE` - 0.23 s, one tap's worth of air, so a rope picked up is more skips per
-  hop and never a second rhythm to survive. Six ropes cross at 0, 3, 5, 8, 11 and 14 frames into
-  the beat and pay six skips for one hop. A rope joining mid-run needs no parking, only the turn
-  of immunity it cannot have earned yet.
+  the sweep hangs overhead where it can be read - 63% of the descent instead of half - and then
+  snaps past the feet, which cuts the threat window to 117 ms against the 161 ms an even sweep at
+  the same cadence would spend there. The beat is untouched: a pass still lands on the same
+  instant, and the hands keep the unwrapped clock, which is what makes the whip read as the rope's
+  inertia instead of a stutter.
+  All the ropes turn one shared clock and differ only by their offset, which holds the whole group
+  inside `BUNDLE` - 0.23 s of real time, one tap's worth of air, spaced against the current turn so
+  a faster sweep does not squeeze the stripes together, and a rope picked up is more skips per
+  hop and never a second rhythm to survive. Six ropes cross inside 233 ms end to end and pay six
+  skips for one hop. A rope joining mid-run needs no parking, only the turn of immunity it cannot
+  have earned yet. A fresh run also parks the sweep a quarter turn past the top
+  (`rope.js:AT_START`) so the first pass lands under the launch arc the opening press doubles as.
 - `world.js` - a dark stage that reads as one: a dusty floor slab, skyline silhouettes that
   swap as she climbs, a cloud band that recycles around the camera, sky that fades to space
   with stars tiering in above it. All altitude-driven, and the sky colour it returns *is*
@@ -182,8 +185,8 @@ the payout - four of them make it every other skip.
 Each level offers three randomly drawn cards from eleven, and you keep one. Cards stack: jump
 height, extra ropes, rope speed, a propeller braid, live wires, better draws, slower falls,
 wider timing, a mid-air hop, a running multiplier, and the crit chance. Rope speed is on that list
-and nowhere else: the sweep holds one revolution a second for the whole run, so the timing
-is still true at minute nine.
+and nowhere else: the sweep holds three revolutions every four seconds for the whole run, so the
+timing learned on the first jump is still true at minute nine.
 
 Two gauges, deliberately unlike each other, because they answer different questions. The
 experience ladder runs along the bottom in rose and only exists while she is jumping: it is the
@@ -221,7 +224,7 @@ changes how a wipeout looks, which is the whole cost.
 | Where | Knob | Effect |
 | ----- | ---- | ------ |
 | `game.js` | `JUMP_V`, `HOLD_LIFT`, `HOLD_MAX` | tap height, what a held press adds to it, and when that apex arrives |
-| `game.js` | `BASE_SPEED` | sweep cadence: one revolution a second |
+| `game.js` | `BASE_SPEED` | sweep cadence: three revolutions every four seconds |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
 | `game.js` | `LEVEL_TIME`, `XP_WINDOW` | the wait a level is solved for, and how many levels the XP bar is drawn across |
@@ -231,6 +234,7 @@ changes how a wipeout looks, which is the whole cost.
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
 | `rope.js` | `WHIP` | how far the sweep hangs aloft before it snaps past the feet |
 | `rope.js` | `BUNDLE` | the span of time the group passes inside: one tap's worth of air |
+| `rope.js` | `AT_START` | where the sweep waits between runs, which sets how long the opening arc has to be |
 | `rope.js` | `JOIN_SETTLE`, `BACK_SETTLE` | turns a new rope, or a rope that survived a loss, cannot end the run |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
@@ -263,16 +267,24 @@ moment one was, in cyan against the rose ladder, and the ladder fades out on the
 card screen, where the same strip of screen belongs to the hint line.
 
 Sweep timing was measured the same way, off the rope angles the collision code itself reads. With
-the sweep parked at the top by `reset`, one hop at a known frame clears a whole group and the
-crossings land at 30 (one rope), 17 and 30 (two), 16, 23, 30 (three), and 16, 19, 21, 24, 27, 30
-(six): 233 ms of spread whatever the count, and skips equal to the number of ropes for that one
-hop. Before the shared clock the same test put the second rope at 45 - after the hop had landed -
-and could not get three ropes across at all, because each rope kept the lag it was parked with
-while the offsets shrank under it. The hang measures 18 of the 30 frames of the descent spent
-above the hand line, against 15 before, and a rope's threat window measures 83 ms against 117.
+the sweep at the top of its turn, one hop at a known frame clears a whole group and the crossings
+land at 40 (one rope), 27 and 40 (two), 26, 33, 40 (three), and 26, 29, 32, 34, 37, 40 (six):
+217-233 ms of spread whatever the count, and skips equal to the number of ropes for that one hop.
+Before the shared clock the same test put the second rope a quarter turn behind the first - after
+the hop had landed - and could not get three ropes across at all, because each rope kept the lag it
+was parked with while the offsets shrank under it. The hang measures 63% of the descent spent above
+the hand line, and a rope's threat window measures 117 ms, against 161 for an even sweep.
 
 The crit roll was read with the chance pinned at each end: 25 skips paid 25 XP at a chance of 0 and
 50 at a chance of 1, so a crit pays exactly double and nothing else moves. At the shipped 0.10 the
 same player banked 216 XP over 200 skips, 1.08 a skip against the 1.10 expected. Taking Crit
 Caliper off the draft took the run parameter from 0.10 to 0.20, and the card's own label reads the
 chance it hands over - 20% CRIT on the first copy, 50% on the fourth.
+
+The slower cadence was checked against the hop rather than against itself: the opening press leaves
+her airborne from frame 2 to 39, and the first pass now lands on frame 29, so the launch arc clears
+it - parked at the top of the turn it landed on frame 40, a frame after she was standing again, and
+tripped the run at 0.63 s. Turns measure 80 frames exactly, the beat is one skip per rope per turn,
+and a level still costs 12 skips, which the scripted player reached at 14 s against the 16 s the
+pacing is solved for. Six ropes still clear in one hop with the span unchanged, because `BUNDLE`
+spaced in seconds does not care what a turn costs.

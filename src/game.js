@@ -26,8 +26,11 @@ const ROPE_W = 0.38;         // radians around bottom that count as "rope at the
                              // short-airtime jumpers (game.js:launchT), which is an invariant
                              // with a commit behind it; being forgiving at the edges is the
                              // better side to be wrong on.
-const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
-                                         // lands on the sweep, slower and the rope stops driving
+const BASE_SPEED = (Math.PI * 2) * 0.75;  // three revolutions every four seconds: faster and the
+                                           // base hop lands on the sweep, slower and the rope
+                                           // stops driving - and at this rate the hop and the
+                                           // beat are far enough apart that she has time to see
+                                           // the next one coming
 const LEVEL_TIME = 16;     // seconds of skipping one level is solved for. More ropes, or a
                            // faster sweep, makes more skips in the same second, and the XP
                            // threshold scales with that rate so the wait between picks holds
@@ -585,9 +588,10 @@ export function createGame(stage) {
         sfx.whoosh();
         // Starting the rope and leaving her standing makes the player tap again half a second
         // later, mid-launch, so one press starts the sweep and takes off and the run begins on
-        // the beat. The rope needs half a revolution to come down to her feet, so this arc is
-        // given the hold assist whether or not the key is still down: the height of any held
-        // press, which is off the ground for longer than that.
+        // the beat. The sweep is parked a quarter turn past the top for exactly this
+        // (rope.js:AT_START), so the first pass lands under this arc instead of just after it, and
+        // the arc gets the hold assist whether or not the key is still down - the height of any
+        // held press - because it is the one arc in a run that has to be airborne at a fixed time.
         vy = u.jumpV;
         launchT = u.holdMax;
         grounded = false;
@@ -683,8 +687,8 @@ export function createGame(stage) {
         hands[0].y += (0.07 - hands[0].y) * letGo;
         hands[1].y += (0.07 - hands[1].y) * letGo;
       }
-      // One revolution a second, and that rate is the whole story: nothing here speeds the
-      // sweep up because the run got long. Rope speed is a card, so it changes when one says so.
+      // Three revolutions every four seconds, and that rate is the whole story: nothing here speeds
+      // the sweep up because the run got long. Rope speed is a card, so it changes when one says so.
       const speed = state === 'run' ? u.ropeSpeed : 0;
       ropeBottom = ropes.update(state === 'run' || state === 'over' ? dt : 0, {
         hands, speed, length: ROPE_A, ground: 0, live: u.live, time,
