@@ -174,15 +174,15 @@ to meet it, which is what lets the bar be drawn across three levels at once
 level is acknowledged. The next threshold is solved from the live skip rate, one skip per rope
 per revolution (`game.js:LEVEL_TIME`, 16 s), so a build with more ropes or a faster sweep earns
 it out of more skips and the wait between picks holds still instead of drifting the way a
-counting-up curve does. A hop that never left the ground much is a tight one and pays more
-(`game.js:CRIT_APEX`): a tap peaks at 0.276 m against 0.49 m for a held hop, so the payout goes
-to the play with the least margin, and the number it pays rides on the label so a build can see
-it. Crit Caliper is the one card that pays in experience instead of height, speed or survival.
+counting-up curve does. A crit is a roll on the skip itself rather than a property of the hop:
+one skip in ten pays double (`cards.js:CRIT_BASE`) and any skip that counts can be the one, so
+the label flying off the counter is the only tell that luck just landed. Crit Caliper is the one
+card that pays in experience instead of height, speed or survival, and it buys the chance and not
+the payout - four of them make it every other skip.
 Each level offers three randomly drawn cards from eleven, and you keep one. Cards stack: jump
 height, extra ropes, rope speed, a propeller braid, live wires, better draws, slower falls,
-wider timing, a mid-air hop, a running multiplier, and the crit payout. Rope speed is on that
-list and nowhere else: the
-sweep holds one revolution a second for the whole run, so the timing learned on the first jump
+wider timing, a mid-air hop, a running multiplier, and the crit chance. Rope speed is on that list
+and nowhere else: the sweep holds one revolution a second for the whole run, so the timing
 is still true at minute nine.
 
 Two gauges, deliberately unlike each other, because they answer different questions. The
@@ -224,7 +224,7 @@ changes how a wipeout looks, which is the whole cost.
 | `game.js` | `BASE_SPEED` | sweep cadence: one revolution a second |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
-| `game.js` | `LEVEL_TIME`, `CRIT_APEX`, `XP_WINDOW` | the wait a level is solved for, the hop height a tight skip has to stay under, and how many levels the XP bar is drawn across |
+| `game.js` | `LEVEL_TIME`, `XP_WINDOW` | the wait a level is solved for, and how many levels the XP bar is drawn across |
 | `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
@@ -235,6 +235,7 @@ changes how a wipeout looks, which is the whole cost.
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the eleven upgrades and their numbers |
+| `cards.js` | `CRIT_BASE`, `CRIT_STEP` | the luck on any one skip, and what a Crit Caliper adds to it |
 | `roster.js` | `ROSTER` | the five jumpers: look and blurb, and no numbers of their own |
 
 ## Checks
@@ -248,11 +249,10 @@ braid climb and a 350 m fall each kept her inside the band the camera is parked 
 +0.85 m). `window.game.debug` exposes live state (`y`, `vy`, `phase`, `phases`, `settle`, `xp`,
 `skips`, `state`, `char`) and `debug.cam` the frame's own decisions (`lo`, `hi`, `up`, `down`,
 `follow`, `a`); `window.game.script` drives input, grants cards and teleports, which is how
-those runs were driven. Pacing, the tight-skip payout and the rope settle were measured the
-same way, against a scripted player: picks at 15, 15.6, 15.9 and 16 s over a 75 s run that
-picked up a rope and a speed card; 33 skips in 40 s with 97% of them tight, which is a pick
-every 8 s, against 31 skips and no tight ones at all for the held line; and a rope granted
-mid-sweep surviving its first turn, where it used to end the run inside a second.
+those runs were driven. Pacing and the rope settle were measured the same way, against a scripted
+player: picks at 15, 15.6, 15.9 and 16 s over a 75 s run that picked up a rope and a speed card,
+33 skips in 40 s against 31 for the held line; and a rope granted mid-sweep surviving its first
+turn, where it used to end the run inside a second.
 
 The two gauges were read off the same scripted player: the ladder measured 2.08%, 8.33% and
 27.08% at 1, 4 and 13 XP against a 16-skip level - the whole bar is three levels wide - and
@@ -270,3 +270,9 @@ hop. Before the shared clock the same test put the second rope at 45 - after the
 and could not get three ropes across at all, because each rope kept the lag it was parked with
 while the offsets shrank under it. The hang measures 18 of the 30 frames of the descent spent
 above the hand line, against 15 before, and a rope's threat window measures 83 ms against 117.
+
+The crit roll was read with the chance pinned at each end: 25 skips paid 25 XP at a chance of 0 and
+50 at a chance of 1, so a crit pays exactly double and nothing else moves. At the shipped 0.10 the
+same player banked 216 XP over 200 skips, 1.08 a skip against the 1.10 expected. Taking Crit
+Caliper off the draft took the run parameter from 0.10 to 0.20, and the card's own label reads the
+chance it hands over - 20% CRIT on the first copy, 50% on the fourth.

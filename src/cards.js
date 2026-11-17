@@ -1,6 +1,11 @@
 // Eleven upgrade cards. Each one edits the same run parameters the physics loop
 // reads, so stacking is just multiplication on shared state - no per-card hooks
 // scattered through the engine.
+
+/** What every counted skip rolls for double XP with no Crit Caliper owned. The roll itself is in
+    the skip path (game.js), and the card below only ever moves this number. */
+export const CRIT_BASE = 0.10;
+const CRIT_STEP = 0.10;    // what one Crit Caliper adds: four of them makes a crit every other skip
 export const CARDS = [
   {
     id: 'soles', icon: '\u{1F45F}', name: 'Higher Soles', tier: 0,
@@ -74,10 +79,12 @@ export const CARDS = [
     // card raises the skip rate, which raises the threshold with it (see levelGap); this one
     // moves picks closer without touching the physics the rope reads.
     id: 'crit', icon: '\u{1F3AF}', name: 'Crit Caliper', tier: 1,
-    blurb: 'A hop that stays low is a CRIT. Pay those out in experience, and pay them bigger.',
+    blurb: 'Any skip can catch: a lucky one pays double experience. This widens the chance it '
+      + 'lands on a given skip.',
     max: 4,
-    apply: (u) => { u.critXp += 1; },
-    level: (n) => `CRIT +${n + 2} XP`,
+    apply: (u) => { u.critChance += CRIT_STEP; },
+    level: (n) => `${Math.round((CRIT_BASE + CRIT_STEP * n) * 100)}% CRIT`,
+    tags: ['xp'],
   },
 ];
 

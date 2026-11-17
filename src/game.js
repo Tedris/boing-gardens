@@ -4,7 +4,7 @@ import * as THREE from '../vendor/three.module.js';
 import { createWorld } from './world.js';
 import { createCharacter } from './character.js';
 import { createRopes } from './rope.js';
-import { CARDS, drawCards } from './cards.js';
+import { CARDS, drawCards, CRIT_BASE } from './cards.js';
 import { ROSTER, byId } from './roster.js';
 import { sfx } from './audio.js';
 import { C, createPost } from './toon.js';
@@ -32,13 +32,6 @@ const LEVEL_TIME = 16;     // seconds of skipping one level is solved for. More 
                            // faster sweep, makes more skips in the same second, and the XP
                            // threshold scales with that rate so the wait between picks holds
                            // still as the build changes underneath it.
-const CRIT_APEX = 0.32;    // a hop has to stay under this to count as a tight one, and tight
-                           // ones pay double XP. Measured on the build: a tap peaks at 0.276 m,
-                           // a held hop at 0.49, so this is exactly "she skipped without the
-                           // assist". Clearance is the obvious measure and it is useless as a
-                           // reward - the shortest hop still passes 0.24 m over the rope, and
-                           // every lower pass is a trip, so a low band pays nobody. The low
-                           // build is the one with no margin, so it is the one that gets paid.
 const XP_WINDOW = 3;       // the XP bar is drawn across this many levels: the one she is in and
                            // the two it runs into, so the ladder ahead is on the gauge rather than
                            // a bar that empties every level. Later gaps are assumed to repeat the
@@ -172,8 +165,8 @@ export function createGame(stage) {
       jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, thrust: 0,
       fuel: 0, fuelMax: 0, live: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
-      levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0, critXp: 2,
-      alt: 0, altMax: 0, sinceSkip: 0, hopApex: 0, fall: '',
+      levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0, critChance: CRIT_BASE,
+      alt: 0, altMax: 0, sinceSkip: 0, fall: '',
     });
     // the numbers are the same for every jumper; only the cards ever move them
     u.xpNeed = levelGap();   // the first threshold, off the sweep rate
@@ -270,13 +263,13 @@ export function createGame(stage) {
     el.xp.classList.toggle('live', state === 'run' || state === 'ready');
   }
 
-  /** A tight skip: the label flies off the counter and a ping sits over the skip tone. It says
-      what the crit paid, because the Crit Caliper changes that number mid-run. */
-  function critFlash(paid) {
+  /** A lucky skip: the label flies off the counter and a ping sits over the skip tone. Any skip
+      that counts can roll one, so this flash is the only tell that luck just landed. */
+  function critFlash() {
     sfx.crit();
-    el.crit.textContent = paid > 1 ? `CRIT +${paid}` : 'CRIT';
+    el.crit.textContent = 'CRIT \u00D72';
     el.crit.classList.remove('on');
-    void el.crit.offsetWidth;   // restart the flight when tight skips come in a run
+    void el.crit.offsetWidth;   // restart the flight when crits come in a row
     el.crit.classList.add('on');
   }
 
@@ -641,7 +634,6 @@ export function createGame(stage) {
         y = 0;
         if (!grounded) {
           grounded = true;
-          u.hopApex = 0;      // the hop is over; the next one is measured from the floor
           // The braid spins back up on the dirt. That is what makes the climb worth buying:
           // fuel that only a card refill brought would last well under a second per pick, so
           // the choice became "spend the upgrade", and now it is "spend the height you gained"
@@ -660,7 +652,6 @@ export function createGame(stage) {
       }
       u.alt = y;
       u.altMax = Math.max(u.altMax, y);
-      u.hopApex = Math.max(u.hopApex, y);
       u.sinceSkip = y;
     } else if (state === 'over') {
       deadT += dt;
@@ -723,12 +714,12 @@ export function createGame(stage) {
               // the rope rides her hands, so its gap to her feet is a constant;
               // what actually reads as "close" is how little dirt she cleared
               if (y < 0.12) nearMiss = 0.25;
-              // A tight one pays double: a hop that never left the ground much cleared the rope
-              // with the least room to spare, and the flash and the ping are what teach that the
-              // band exists at all.
-              const crit = u.hopApex < CRIT_APEX;
-              u.xp += crit ? u.critXp : 1;
-              if (crit) critFlash(u.critXp);
+              // A crit rolls on the skip itself, not on the shape of the hop: any skip that
+              // counts can double, so luck lands anywhere in a run and buying the chance reads as
+              // fortune rather than as a different way to jump.
+              const crit = Math.random() < u.critChance;
+              u.xp += crit ? 2 : 1;
+              if (crit) critFlash();
               sfx.skip(u.skips);
               char.bump(0.4, 0.25);
               el.skips.classList.add('pop');
@@ -884,7 +875,7 @@ export function createGame(stage) {
         pose: [Math.round(char.group.position.x * 1000) / 1000,
           Math.round(char.group.rotation.z * 100) / 100, Math.round(char.group.rotation.x * 100) / 100],
         settle: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.settle * 100) / 100),
-        xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed,
+        xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed, crit: u.critChance,
       };
     },
     /** drive the game from a script (used for automated checks) */
