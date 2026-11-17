@@ -16,10 +16,12 @@ import { C, part, spring, springKick, springState } from './toon.js';
 
 // proportions, in metres, feet at 0
 const P = {
-  hipY: 0.62, hipX: 0.085, knee: -0.24, ankle: -0.20,
+  hipY: 0.62, hipX: 0.14, knee: -0.24, ankle: -0.20,
   torsoY: 0.96, shoulderY: 1.08, shoulderX: 0.19,
   armUp: 0.15, armFore: 0.14, headY: 1.17, headR: 0.42,
-  handY: 1.00, handX: 0.31,      // where the rope hangs from: see ROPE_A in game.js
+  handY: 1.00, handX: 0.42,      // where the rope hangs from: see ROPE_A in game.js. Wide -
+                                 // the loop is as wide as the hands are apart, so this, not
+                                 // any flare in rope.js, is what stands the rope off her body
 };
 
 // snap-block quantum at her plane, used to keep spring travel visible
@@ -74,6 +76,9 @@ export function createCharacter() {
   pelvis.position.y = 0.02;
   hips.add(pelvis);
 
+  // A stance, not a parade: hipX is set so the legs hang outside the pelvis box instead of
+  // touching each other under it, which is what a jumper standing ready looks like, and what
+  // gives the knees somewhere to travel on a landing.
   const leg = [];
   for (const sx of [-1, 1]) {
     const thigh = new THREE.Group();
@@ -468,7 +473,10 @@ export function createCharacter() {
     leg.forEach((L, i) => {
       const wob = Math.sin(t * 2.1 + i * 2.2) * 0.03;
       L.thigh.rotation.x = lerp(L.thigh.rotation.x, -0.62 * tuck + (s.thrust ? 1.15 : 0) + crouch * 0.7 + wob, 0.22);
-      L.thigh.rotation.z = lerp(L.thigh.rotation.z, (i ? -1 : 1) * (0.05 + tuck * 0.10 + rag * 0.5), 0.2);
+      // on the ground the legs stand slightly open, so the feet sit under the hips instead of
+      // knocking inward at the knee; the tuck reverses it in the air, where knees together is
+      // the shape you want.
+      L.thigh.rotation.z = lerp(L.thigh.rotation.z, (i ? -1 : 1) * (tuck * 0.14 - 0.045 + rag * 0.5), 0.2);
       L.knee.rotation.x = lerp(L.knee.rotation.x, 0.95 * tuck - crouch * 1.5 + (s.thrust ? -0.35 : 0), 0.22);
       L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.35 * tuck + crouch * 0.9, 0.2);
       L.flame.visible = !!s.thrust;

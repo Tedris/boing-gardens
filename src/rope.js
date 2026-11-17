@@ -13,7 +13,10 @@ import { C } from './toon.js';
 const K = 26;            // segments per rope: few enough that the arc reads as steps
 const R = 0.08;         // rope thickness: at 240 rows this is a four-pixel band, which is
                         // what survives the upscale; thinner reads as a hairline
-const BOW = 1.0;        // extra lateral spread aloft, added at the mid-rope
+const BOW = 1.35;       // extra lateral spread aloft, added at the mid-rope. It bulges the
+                        // quarter-points of the loop out past the handle line; most of the
+                        // loop's width is the hand spread itself (character.js handX), since
+                        // the ends of the arc are pinned to the handles.
 const MAXR = 6;          // rope ceiling
 const LAG = Math.PI * 0.5; // preferred phase step between ropes: a quarter turn, 0.25 s a part
 const HOP_SPAN = 0.61;    // turns of the sweep one fully held hop stays airborne, measured on the

@@ -15,8 +15,17 @@ const JUMP_V = 3.8;          // a tap: ~0.31m apex, ~0.32s off the ground - over
 const HOLD_LIFT = 13.2;      // extra upward accel while holding, which is what turns that tap
                              // into the ~0.70m hop a single press used to give on its own
 const HOLD_MAX = 0.40;       // seconds of hold assist: the held apex arrives as it runs out
-const ROPE_A = 1.05;         // rope length: hand anchor height + a little slack
-const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet"
+const ROPE_A = 1.18;         // rope length: hand anchor height plus enough slack that the
+                             // sweep reads as a loop around her rather than a band on the body
+const ROPE_W = 0.38;         // radians around bottom that count as "rope at the feet". A rope
+                             // this long touches dirt out to acos((P.handY - 0.05) / ROPE_A) =
+                             // 0.64 rad, so the rule is deliberately narrower than the picture
+                             // by 0.25 rad either side - 40 ms where the rope grazes the floor
+                             // and does nothing. Widening it to match the geometry exactly
+                             // would eat the opening hop's margin over the first pass on the
+                             // short-airtime jumpers (game.js:launchT), which is an invariant
+                             // with a commit behind it; being forgiving at the edges is the
+                             // better side to be wrong on.
 const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
                                          // lands on the sweep, slower and the rope stops driving
 
@@ -765,6 +774,10 @@ export function createGame(stage) {
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
         holding, thrusting, down, paused, char: charId, cam: camDbg,
         phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
+        // every live rope's absolute phase, not just the first one's: a bot timing N ropes
+        // cannot derive them from the offsets, because a reset parks a rope at PI - offset
+        // rather than PI + offset (rope.js:reset).
+        phases: ropes.ropes.filter((r) => r.active).map((r) => r.theta + r.offset),
       };
     },
     /** drive the game from a script (used for automated checks) */
