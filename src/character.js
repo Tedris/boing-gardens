@@ -456,11 +456,12 @@ export function createCharacter() {
     topple: { pitch: 0.10, roll: 1.52, sink: 0.40, hips: 0.12, thigh: 0.40, knee: 0.55,
       spread: 0.45, arm: -1.50, armOut: 0.50, elbow: 0.35, head: 0.30, headYaw: -0.30 },
     // Sitting up means the arms come down: `armOut` rides on a base of 2.1, which splays the
-    // arms of a body lying on its side out along the dirt. A torso that is still upright has to
-    // pull that base back, or she sits with her hands in the air - and the rope, held by those
-    // hands, stands up around her as a hoop instead of lying where it fell.
-    sit: { pitch: 0.00, roll: 0.04, sink: 0.00, drop: 0.34, hips: -0.50, thigh: 0.95, knee: 0.55,
-      spread: 0.55, arm: 0.45, armOut: -1.75, elbow: 0.35, head: 0.55, headYaw: 0.10 },
+    // arms of a body lying on its side out along the dirt, and a torso that is still upright has
+    // to pull that base back or she sits with her hands in the air. The legs go out to the
+    // sides and the knees bend: forward is toward the lens at this camera, so a sit with her
+    // knees straight ahead is a stump with a head on it.
+    sit: { pitch: -0.35, roll: 0.04, sink: 0.00, drop: 0.40, hips: -0.15, thigh: -0.55, knee: 1.00,
+      spread: 1.05, arm: 0.45, armOut: -1.75, elbow: 0.35, head: 0.55, headYaw: 0.10 },
     shock: { pitch: 0.00, roll: 1.60, sink: 0.42, hips: 0.05, thigh: 0.05, knee: 0.08,
       spread: 0.10, arm: -1.60, armOut: 1.10, elbow: 0.05, head: -0.35, headYaw: 0.35 },
   };

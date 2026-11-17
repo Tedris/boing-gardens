@@ -149,7 +149,7 @@ export function createGame(stage) {
   // for machines that own both kinds of input.
   let touchUI = document.documentElement.dataset.touch === '1';
   const goText = () => (touchUI ? 'TAP ANYWHERE' : 'PRESS SPACE');
-  const goAgainText = () => (touchUI ? 'TAP TO GO AGAIN' : 'PRESS SPACE TO GO AGAIN');
+  const goAgainText = () => (touchUI ? 'TAP FOR THE ROSTER' : 'PRESS SPACE FOR THE ROSTER');
   function setTouchUI(on) {
     if (typeof on !== 'boolean' || on === touchUI) return;
     touchUI = on;
@@ -167,9 +167,8 @@ export function createGame(stage) {
       levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0,
       alt: 0, altMax: 0, sinceSkip: 0, hopApex: 0, fall: '',
     });
-    // who is jumping decides the starting numbers; cards stack on top of that
-    who().apply(u);
-    u.xpNeed = levelGap();   // the first threshold, off the character's own sweep rate
+    // the numbers are the same for every jumper; only the cards ever move them
+    u.xpNeed = levelGap();   // the first threshold, off the sweep rate
     y = 0; vy = 0; grounded = true; holdT = 0; holding = false; launchT = 0;
     camAnchor = 0; camY = 1.05;   // a new run frames the ground, not the last run's ceiling
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
@@ -388,10 +387,11 @@ export function createGame(stage) {
   }
 
   // ---------------- who is jumping ----------------
-  // The look is the same rig recoloured and rescaled (character.js setLook); the physics is
-  // a patch over a fresh run, so a jumper and an upgrade deck compose instead of fighting.
-  // The pick is not remembered: every load starts on the roster's first row, and pressing a
-  // number changes the run you are in.
+  // The look is the same rig recoloured and rescaled (character.js setLook), and it is all
+  // the row carries: five jumpers, one set of numbers, so picking a face is a decision about
+  // who you want to watch and not about how the run goes. The pick is not remembered: every
+  // load starts on the roster's first row, and pressing a number changes the run in front of
+  // you - which is also why a run ends by handing you the roster back.
   let charId = ROSTER[0].id;
   const who = () => byId(charId);
 
@@ -430,7 +430,11 @@ export function createGame(stage) {
     const c = ROSTER[i];
     if (!c) return;
     setCharacter(c.id);
-    freshRun();     // the numbers have to change now, not on the run after this one
+    freshRun();       // the numbers have to change now, not on the run after this one
+    // Picking out of a wipeout has to put the last run away as well as start the next one:
+    // freshRun clears the dead flag, and this is what stands her back up, hides the stats and
+    // brings the frame down from wherever the fall left it.
+    resetScreen();
     el.pick.classList.remove('on');
     el.skips.classList.remove('hide');
     state = 'ready';
@@ -469,7 +473,9 @@ export function createGame(stage) {
     // one is due, rather than a hop at a rope position nobody chose.
     if (paused) { setPause(false); return; }
     if (state === 'title') { showSelect(); return; }   // one look at the roster first
-    if (state === 'over') { startRun(); return; }
+    // A run ends by returning to the roster rather than dropping straight back in: the face
+    // you died with is a decision worth making again, and the panel has just told you it lost.
+    if (state === 'over') { showSelect(); return; }
     if (state === 'draft' || state === 'select') return;
     down = true;
     pressEdge = true;
@@ -648,15 +654,19 @@ export function createGame(stage) {
       const dy = y - char.group.position.y;
       hands[0].y += dy;
       hands[1].y += dy;
+      // A wipeout means she let go, and the handles come down to the dirt over the same half
+      // second as the fall. Held in her hands the rope does not lie down: a topple leaves her
+      // arms flung up, and the arc hangs from them as a hoop framing the body it just tripped.
+      if (dead) {
+        const letGo = Math.min(1, deadT / 0.4);
+        hands[0].y += (0.07 - hands[0].y) * letGo;
+        hands[1].y += (0.07 - hands[1].y) * letGo;
+      }
       // One revolution a second, and that rate is the whole story: nothing here speeds the
       // sweep up because the run got long. Rope speed is a card, so it changes when one says so.
       const speed = state === 'run' ? u.ropeSpeed : 0;
-      // A trip catches her at the bottom of the sweep, where the arc is a hoop standing at
-      // ankle height around the body that just fell. Slack goes into it as she goes down, so
-      // the rope lies along the dirt by the time the fall settles instead of framing her.
-      const slack = dead ? Math.min(0.34, deadT * 0.8) : 0;
       ropeBottom = ropes.update(state === 'run' || state === 'over' ? dt : 0, {
-        hands, speed, length: ROPE_A + slack, ground: 0, live: u.live, time,
+        hands, speed, length: ROPE_A, ground: 0, live: u.live, time,
       });
 
       if (state === 'run') {

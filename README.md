@@ -37,17 +37,19 @@ faint, so it is obvious which one you are being let off.
 
 What a wipeout looks like is drawn on the spot - a crumple, a topple, a sit - so the same
 mistake does not look the same twice, and each one ends with her settled where she fell instead
-of twitching in place. A live rope skips the draw: a fourth pose, rigid first, then flat. The
-trip catches the rope at the bottom of its sweep, standing around her as a hoop at ankle height,
-so slack goes into it as she goes down and it lies along the dirt by the time the pose settles.
+of twitching in place. A live rope skips the draw: a fourth pose, rigid first, then flat. A
+wipeout also lets go of the rope — the handles come down to the dirt with her, so it lies along
+the ground instead of hanging from whatever position the fall left her arms in.
 
 The title opens the roster before it lets a run start, because the jumper is the first
-decision and there is no reason to hide it behind a menu: five of them, one rig. `C` or
-the swap button steps through the list without opening the panel, and both are refused
-while a run is live — swapping legs mid-run would be a different run, not a shortcut.
-Picking re-seeds the run numbers where it happens (`pickChar`), since numbers that only
-arrive on the *next* run read as a dead button. The pick is not remembered across loads:
-every opening frame is the roster's first row, and a number changes the run in front of you.
+decision and there is no reason to hide it behind a menu: five of them, one rig, one set of
+numbers. `C` or the swap button steps through the list without opening the panel, and both are
+refused while a run is live — swapping legs mid-run would be a different run, not a shortcut.
+Picking starts the next run there and then (`pickChar`), since a face that only arrives on the
+run *after* this one reads as a dead button. The pick is not remembered across loads:
+every opening frame is the roster's first row, and a number changes the run in front of you. A
+run ends the way it began: the wipeout panel asks for the roster rather than dropping you back
+in with the same face, because who you want to watch is a decision worth making again.
 
 A run also pauses itself when the tab or window loses focus, so an alt-tab or an
 app switch is never a wipeout. On a phone the pause button is the only way in and
@@ -115,11 +117,14 @@ is what keeps it readable at any rope count or height:
   lean, nod, the bob and the scarf; a two-bone IK (`reach`) aims the hands at the anchors the rope
   hangs from, so the arm pose is a *consequence* of the rope instead of a keyframed guess
   that has to match it.
-- `roster.js` — the five jumpers as a table, not five engines: `look` is a palette remap
-  plus shape scalars handed to `character.js:setLook` (plus `hair: false`, which puts Muffler
-  in a cap and a scarf where everyone else has a bob), and `apply` patches a fresh run's
-  numbers in the same style as a card, so a character is a starting build that cards still
-  stack on top of. The blurb is the spec — if she falls like a rumour, `fallDrag` says so.
+- `roster.js` — the five jumpers as a table, not five engines: `look` is a palette remap plus
+  shape scalars handed to `character.js:setLook` (plus `hair: false`, which puts Muffler in a
+  cap and a scarf where everyone else has a bob). A row carries no numbers at all — every
+  jumper takes off at the same speed on the same sweep, and only the cards move them — so the
+  bounce is where the humour has to live: `squash` is how far the body pancakes on a landing
+  and `jig` how far the soft parts swing on after it, both drawn rather than simulated, which
+  is what lets one row flatten like a dropped pie and another stand perfectly still while
+  everything above her neck is still arriving.
 - `rope.js` — each rope is a real arc rotating around the hand axis, beaded so the sweep is
   legible and the stripes read at speed, and bowing outward aloft so it reads as a rope on
   a pivot rather than a narrow hoop. It turns the way a rope actually turns - down the
@@ -182,7 +187,7 @@ changes how a wipeout looks, which is the whole cost.
 
 - Name, character design, palette, UI copy and card names are original. She has a teal bob
   and a hair clip, not anyone else's silhouette, and the other four jumpers are that one
-  rig recoloured and re-tuned rather than five borrowed designs — Muffler's cap and scarf
+  rig recoloured and re-proportioned rather than five borrowed designs — Muffler's cap and scarf
   included, since that silhouette comes from this project's own earlier browser build.
   Everyone in here is a
   rectangle, which settles the suggestive-content question at the source.
@@ -213,12 +218,12 @@ changes how a wipeout looks, which is the whole cost.
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the ten upgrades and their numbers |
-| `roster.js` | `ROSTER` | the five jumpers: look, blurb and starting numbers |
+| `roster.js` | `ROSTER` | the five jumpers: look and blurb, and no numbers of their own |
 
 ## Checks
 
 No build step and no test suite; behaviour was verified in a browser at 1024x707: title →
-roster → pick by key → run → level-up draft → card pick by key → trip → game over → restart,
+roster → pick by key → run → level-up draft → card pick by key → trip → game over → roster again,
 five jumpers, three ropes turned live, and 700 m frames driven through
 `window.game.script.fly()`. Framing was measured the same way, as her feet against the frame
 centre: eight plain hops with no cards moved the frame 1 cm in total, and a six-metre jump, a
