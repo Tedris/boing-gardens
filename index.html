@@ -61,6 +61,20 @@
   #skips.pop{transform:translateX(-50%) scale(1.06)}
   #skips.hide{opacity:0}
 
+  /* A tight skip pays double XP, so it says so: the label flies off the counter and is gone
+     well before the next skip can land a second one on top of it. */
+  #crit{
+    position:absolute;left:50%;top:100%;transform:translateX(-50%);
+    font-size:13px;letter-spacing:.18em;font-weight:700;color:var(--accent);
+    opacity:0;pointer-events:none;white-space:nowrap;
+  }
+  #crit.on{animation:critfly .62s ease-out}
+  @keyframes critfly{
+    0%{opacity:0;transform:translate(-50%,4px) scale(.85)}
+    16%{opacity:1;transform:translate(-50%,-6px) scale(1.14)}
+    100%{opacity:0;transform:translate(-50%,-34px) scale(1)}
+  }
+
   /* ---- multiplier badge ---- */
   #mult{
     position:absolute;left:100%;top:50%;margin-left:12px;transform:translateY(-50%);
@@ -294,7 +308,7 @@
 <body>
   <div id="stage"></div>
 
-  <div id="skips"><span id="skipnum">0</span><div id="mult">&times;1</div></div>
+  <div id="skips"><span id="skipnum">0</span><div id="mult">&times;1</div><div id="crit">CRIT</div></div>
 
   <div id="pill">
     <div class="bar"><div class="fill"></div></div>

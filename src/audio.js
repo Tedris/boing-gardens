@@ -76,6 +76,11 @@ export const sfx = {
     if (!ctx || muted) return;
     tone(880 + Math.min(n, 24) * 22, 0.06, { gain: 0.07, type: 'square' });
   },
+  crit() {
+    if (!ctx || muted) return;
+    tone(1568, 0.09, { gain: 0.08, type: 'square' });
+    tone(2093, 0.11, { gain: 0.05, type: 'square', delay: 0.045 });
+  },
   land(impact = 1) {
     if (!ctx || muted) return;
     tone(78, 0.14, { gain: Math.min(0.24, 0.09 + impact * 0.02), type: 'sine', slide: -26 });

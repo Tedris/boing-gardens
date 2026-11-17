@@ -28,6 +28,17 @@ const ROPE_W = 0.38;         // radians around bottom that count as "rope at the
                              // better side to be wrong on.
 const BASE_SPEED = (Math.PI * 2) / 1.0;  // one revolution a second: faster and the base hop
                                          // lands on the sweep, slower and the rope stops driving
+const LEVEL_TIME = 16;     // seconds of skipping one level is solved for. More ropes, or a
+                           // faster sweep, makes more skips in the same second, and the XP
+                           // threshold scales with that rate so the wait between picks holds
+                           // still as the build changes underneath it.
+const CRIT_APEX = 0.32;    // a hop has to stay under this to count as a tight one, and tight
+                           // ones pay double XP. Measured on the build: a tap peaks at 0.276 m,
+                           // a held hop at 0.49, so this is exactly "she skipped without the
+                           // assist". Clearance is the obvious measure and it is useless as a
+                           // reward - the shortest hop still passes 0.24 m over the rope, and
+                           // every lower pass is a trip, so a low band pays nobody. The low
+                           // build is the one with no margin, so it is the one that gets paid.
 
 const BEST_KEY = 'boing-gardens-best';
 
@@ -101,6 +112,7 @@ export function createGame(stage) {
   const el = {
     skips: document.getElementById('skips'),
     skipnum: document.getElementById('skipnum'),
+    crit: document.getElementById('crit'),
     mult: document.getElementById('mult'),
     pillNum: document.querySelector('#pill .num'),
     fill: document.querySelector('#pill .fill'),
@@ -150,11 +162,12 @@ export function createGame(stage) {
       jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, thrust: 0,
       fuel: 0, fuelMax: 0, fire: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
-      levels: {}, skips: 0, score: 0, level: 1, xpNeed: 12, xpBase: 0,
-      alt: 0, altMax: 0, sinceSkip: 0,
+      levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0,
+      alt: 0, altMax: 0, sinceSkip: 0, hopApex: 0,
     });
     // who is jumping decides the starting numbers; cards stack on top of that
     who().apply(u);
+    u.xpNeed = levelGap();   // the first threshold, off the character's own sweep rate
     y = 0; vy = 0; grounded = true; holdT = 0; holding = false; launchT = 0;
     camAnchor = 0; camY = 1.05;   // a new run frames the ground, not the last run's ceiling
     airLeft = 0; thrusting = false; dead = false; deadT = 0;
@@ -202,6 +215,17 @@ export function createGame(stage) {
     if (chip) chip.classList.add('bump');
   }
 
+  /**
+   * The next XP threshold, solved for a flat wait instead of counting up. One skip per rope per
+   * revolution, so a build with more ropes or a faster sweep earns the same threshold out of
+   * more skips and the time between picks is what stays put. Counting up by a level-sized step
+   * is what this replaces: picks drifted from half a minute apart to over a minute by the
+   * sixth, which is a long time to be offered nothing.
+   */
+  function levelGap() {
+    return Math.max(4, Math.round(LEVEL_TIME * u.ropes * u.ropeSpeed / (Math.PI * 2)));
+  }
+
   function multiplier() {
     return u.mult * (1 + u.combo * Math.min(3, u.skips / 45));
   }
@@ -217,9 +241,17 @@ export function createGame(stage) {
     }
     el.pillNum.textContent = u.ropes;
     el.cap.textContent = u.thrust > 0 ? 'FUEL' : 'ROPES';
-    const prog = (u.skips - u.xpBase) / Math.max(1, u.xpNeed - u.xpBase);
+    const prog = u.xp / Math.max(1, u.xpNeed);
     el.fill.style.height = `${Math.max(0, Math.min(1, u.thrust > 0 ? u.fuel / u.fuelMax : prog)) * 100}%`;
     el.alt.textContent = `${Math.floor(Math.max(0, y))} m`;
+  }
+
+  /** A tight skip: the label flies off the counter and a ping sits over the skip tone. */
+  function critFlash() {
+    sfx.crit();
+    el.crit.classList.remove('on');
+    void el.crit.offsetWidth;   // restart the flight when tight skips come in a run
+    el.crit.classList.add('on');
   }
 
   function hint(txt) {
@@ -335,8 +367,8 @@ export function createGame(stage) {
     if (!c) return;
     applyCard(c);
     u.level++;
-    u.xpNeed += 10 + u.level * 5;
-    u.xpBase = u.skips;
+    u.xp = 0;
+    u.xpNeed = levelGap();
     bumpChip(c.id);
     sfx.pick();
     el.draft.classList.remove('on');
@@ -565,6 +597,7 @@ export function createGame(stage) {
         y = 0;
         if (!grounded) {
           grounded = true;
+          u.hopApex = 0;      // the hop is over; the next one is measured from the floor
           sfx.land(impact * u.landEase);
           char.bump(-impact * 0.075, 0.12);
           char.puff(0.0, 0.06, 0.15, 1.1);
@@ -577,6 +610,7 @@ export function createGame(stage) {
       }
       u.alt = y;
       u.altMax = Math.max(u.altMax, y);
+      u.hopApex = Math.max(u.hopApex, y);
       u.sinceSkip = y;
     } else if (state === 'over') {
       deadT += dt;
@@ -619,10 +653,10 @@ export function createGame(stage) {
           // player sees the rope sweep past her feet, so the plane follows her
           // feet: off the floor when it passes is a skip, a foot down is a trip.
           const clear = y > 0.03;
-          // A rope still inside its grace turn cannot end the run. It is the one the player
+          // A rope still settling into the sweep cannot end the run. It is the one the player
           // has not heard yet, and before this it arrived, tripped her out of a rhythm that
           // was working, and was gone inside a second of being picked up.
-          const safe = r.grace > 0;
+          const safe = r.settle > 0;
           if (r.crossed) {
             if (clear) {
               u.skips++;
@@ -631,11 +665,17 @@ export function createGame(stage) {
               // the rope rides her hands, so its gap to her feet is a constant;
               // what actually reads as "close" is how little dirt she cleared
               if (y < 0.12) nearMiss = 0.25;
+              // A tight one pays double: a hop that never left the ground much cleared the rope
+              // with the least room to spare, and the flash and the ping are what teach that the
+              // band exists at all.
+              const crit = u.hopApex < CRIT_APEX;
+              u.xp += crit ? 2 : 1;
+              if (crit) critFlash();
               sfx.skip(u.skips);
               char.bump(0.4, 0.25);
               el.skips.classList.add('pop');
               setTimeout(() => el.skips.classList.remove('pop'), 90);
-              if (u.skips >= u.xpNeed) { levelUp(); break; }
+              if (u.xp >= u.xpNeed) { levelUp(); break; }
             } else if (!safe) {
               trip();
             }
@@ -782,7 +822,8 @@ export function createGame(stage) {
         // cannot derive them from the offsets, because a reset parks a rope at PI - offset
         // rather than PI + offset (rope.js:reset).
         phases: ropes.ropes.filter((r) => r.active).map((r) => r.theta + r.offset),
-        grace: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.grace * 100) / 100),
+        settle: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.settle * 100) / 100),
+        xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed,
       };
     },
     /** drive the game from a script (used for automated checks) */
