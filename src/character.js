@@ -542,7 +542,9 @@ export function createCharacter() {
     });
 
     // ---- arms: the hands anchor to the swing the rope hangs from, so the arm
-    // pose is a consequence of the rope rather than a guess that must match it ----
+    // pose is a consequence of the rope rather than a guess that must match it.
+    // It is the clock the rope is driven by, not the rope's own angle: the hands
+    // keep the beat and the rope whips through it (rope.js:WHIP). ----
     const ph = s.phase;
     for (const a of arm) {
       if (s.dead) {

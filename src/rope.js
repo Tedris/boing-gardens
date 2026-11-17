@@ -18,7 +18,13 @@ const BOW = 1.35;       // extra lateral spread aloft, added at the mid-rope. It
                         // loop's width is the hand spread itself (character.js handX), since
                         // the ends of the arc are pinned to the handles.
 const MAXR = 6;          // rope ceiling
-const LAG = Math.PI * 0.5; // preferred phase step between ropes: a quarter turn, 0.25 s a part
+const WHIP = 0.42;       // how far the sweep hangs overhead and then snaps through the bottom. The
+                         // rope's geometric angle is the hand clock warped by WHIP*sin(clock): it
+                         // dwells at the top where it can be read, arrives fast, and spends less
+                         // *time* at her feet than a uniform sweep of the same cadence. The beat is
+                         // untouched - a pass still lands on exactly the instant it used to - and
+                         // the hands keep the unwrapped clock, which is what makes the whip read as
+                         // the rope's own inertia instead of a stutter.
 const JOIN_SETTLE = 1.0;   // turns a rope that has just joined cannot end a run. A rope picked
                            // up mid-sweep arrives inside a rhythm that is already working, and
                            // its first pass is the one that ends the run most often; a turn to
@@ -27,10 +33,17 @@ const JOIN_SETTLE = 1.0;   // turns a rope that has just joined cannot end a run
 const BACK_SETTLE = 0.5;   // turns the survivors get to settle when a rope is lost under them:
                            // that stumble re-spaces the sweep, and a rhythm nobody asked to
                            // change should not cost a second rope either.
-const HOP_SPAN = 0.61;    // turns of the sweep one fully held hop stays airborne, measured on the
-                          // build (game.js JUMP_V, HOLD_LIFT, HOLD_MAX): the span every rope has
-                          // to fit inside
+const BUNDLE = 0.23;     // turns of the sweep the whole group of ropes is spread across. A tap is
+                         // 0.32 s off the ground, and the danger window at the fast end of WHIP is
+                         // about 0.085 s of it, so the passes have to arrive inside what is left -
+                         // otherwise an added rope asks for a hop held longer than the short hop
+                         // that pays the crit.
 const UP = new THREE.Vector3(0, 1, 0);
+
+// geometric angle from the clock angle. Monotone (1 + WHIP*cos >= 1 - WHIP > 0) and exactly
+// periodic (warp(p + 2PI) = warp(p) + 2PI), so every offset and crossing test keeps working in
+// clock terms while the geometry and the danger window read the warped angle.
+const warp = (p) => p + WHIP * Math.sin(p);
 const GQ = new THREE.Quaternion();
 
 // cream with one contrasting stripe per rope: the stripe is what makes the sweep
@@ -72,7 +85,7 @@ export function createRopes() {
 
     group.add(segs);
     ropes.push({
-      theta: Math.PI, prevAbs: Math.PI, beads: segs, active: i === 0,
+      theta: Math.PI, abs: Math.PI, prevAbs: Math.PI, beads: segs, active: i === 0,
       radius: 0, offset: 0, crossed: false, settle: 0,
     });
   }
@@ -95,14 +108,20 @@ export function createRopes() {
   sparks.visible = false;
   group.add(sparks);
   let eNext = 0;
+  // One clock for the whole group: the ropes differ only by their offset off it. Keeping the
+  // relationship in the offsets rather than in per-rope angles is what makes the bundle exact -
+  // with their own angles, a rope that joined earlier kept the lag it was parked with, the
+  // offsets shrank under it as ropes were added, and the group drifted further apart in time
+  // than BUNDLE promises, which is the one thing this file exists to get right.
+  let clock = Math.PI;
 
-  /** Keep n ropes running; spread their phases so each one asks for its own jump. */
+  /** Keep n ropes running; bundle their offsets so the group is one hop's worth of passes. */
   function setCount(n) {
-    // A quarter turn between ropes: 0.25 s at the base cadence, which sits inside one hop, so
-    // an added rope means more skips per jump instead of one thicker rope, or a jump you have
-    // to survive in between. Past three ropes that spacing would stretch the last pass beyond
-    // the end of a held hop, so the step tightens to whatever still fits inside one hop.
-    const step = Math.min(LAG, (Math.PI * 2) * HOP_SPAN / Math.max(1, n - 1));
+    // One bundle rather than a queue: every rope in the group passes inside a single tap, so a
+    // rope picked up is more skips per hop instead of a second rhythm to survive. The step is
+    // what keeps the passes apart as stripes rather than one thick rope, and it tightens as the
+    // group grows so the span between the first and the last pass stays BUNDLE whatever n is.
+    const step = (Math.PI * 2) * BUNDLE / Math.max(1, n - 1);
     for (let i = 0; i < MAXR; i++) {
       const r = ropes[i];
       const was = r.active;
@@ -110,15 +129,13 @@ export function createRopes() {
       r.beads.visible = r.active;
       r.radius = i * 0.055;
       r.offset = i * step;
-      // A rope that has been sitting inactive does not advance, so its own angle is from
-      // the last reset and says nothing about where the sweep is now. Park a rope joining
-      // mid-run behind the one it joins, measured off that rope's live angle - otherwise it
-      // appears at the top of the arc whenever the card happened to be picked, which is
-      // either a free skip or an instant trip.
+      r.theta = clock;
+      r.abs = warp(clock + r.offset);
+      // A rope that has not been running arrives inside a rhythm that is already working. It
+      // needs no parking - the offset puts it one step behind its neighbour on the shared clock -
+      // but it has not been heard yet, so it cannot end a run for a turn.
       if (r.active && !was && i > 0) {
-        const abs = ropes[i - 1].theta + ropes[i - 1].offset - step;
-        r.theta = abs - r.offset;
-        r.prevAbs = abs;
+        r.prevAbs = r.abs;
         r.crossed = false;
         r.settle = JOIN_SETTLE;
       }
@@ -179,17 +196,18 @@ export function createRopes() {
       let sparking = false;
       const live = !!s.live;
 
+      if (speed > 0) clock += speed * dt;   // one revolution a second, one clock, no exceptions
       for (const r of ropes) {
         if (!r.active) continue;
-        r.prevAbs = r.theta + r.offset;
-        r.theta += speed * dt;
-        const theta = r.theta + r.offset;
-        const bottom = build(r, theta, hands, length, ground);
+        r.prevAbs = r.abs;
+        r.theta = clock;
+        r.abs = warp(clock + r.offset);
+        const bottom = build(r, r.abs, hands, length, ground);
         lowest = Math.min(lowest, bottom);
 
         // wrapped past the bottom of the sweep? offsets must count, or a rope
         // would report its crossing a different instant than its geometry crosses
-        r.crossed = Math.floor(theta / (Math.PI * 2)) > Math.floor(r.prevAbs / (Math.PI * 2));
+        r.crossed = Math.floor(r.abs / (Math.PI * 2)) > Math.floor(r.prevAbs / (Math.PI * 2));
 
         // settling is counted in turns, not seconds: a fast sweep and a slow one offer the
         // same number of passes to learn where the rope falls
@@ -229,17 +247,18 @@ export function createRopes() {
       return lowest;
     },
     /**
-     * Restart the sweep: the first rope at the top of the arc, so the pass that decides the
-     * next jump is half a revolution away. The rest keep their quarter-turn lag rather than
-     * being collapsed onto it - collapsed is what a restart after losing a rope would give,
-     * and surviving ropes all arriving in the same instant is one wide rope, not a fair sweep.
-     * `recovering` is that restart, and it gives the survivors BACK_SETTLE: the sweep they
-     * re-spaced into is not the rhythm they were being swept in.
+     * Restart the sweep with the first rope at the top of the arc, so the pass that decides the
+     * next jump is half a revolution away. The rest follow on their offsets rather than being
+     * collapsed onto it - collapsed is what a restart after losing a rope would give, and ropes
+     * all arriving in the same instant is one wide rope, not a bundle you can read. `recovering`
+     * is that restart, and it gives the survivors BACK_SETTLE: the bundle they re-spaced into is
+     * not the rhythm they were being swept in.
      */
     reset(recovering) {
+      clock = Math.PI;   // one clock: every rope's angle is this plus its own offset
       for (const r of ropes) {
-        r.theta = Math.PI - 2 * r.offset;   // abs = theta + offset = PI - offset
-        r.prevAbs = Math.PI - r.offset;
+        r.theta = clock;
+        r.abs = r.prevAbs = warp(clock + r.offset);
         r.crossed = false;
         r.settle = recovering ? BACK_SETTLE : 0;
       }

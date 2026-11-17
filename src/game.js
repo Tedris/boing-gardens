@@ -703,8 +703,8 @@ export function createGame(stage) {
         const w = Math.max(0.14, ROPE_W - u.grace);
         for (const r of ropes.ropes) {
           if (!r.active) continue;
-          const abs = r.theta + r.offset;
-          const c = Math.cos(abs);
+          const abs = r.abs;   // where the rope is, not the clock driving it: the danger window
+          const c = Math.cos(abs);   // has to be the geometry on screen, or the whip is invisible
           // The rope rides her hands, so its geometric bottom climbs with the
           // jump stretch and the arm swing - reading the pass/fail plane off it
           // made a skip depend on her pose and on last frame's matrices. The
@@ -750,7 +750,9 @@ export function createGame(stage) {
     char.update(dt, {
       time, y, vy,
       grounded: state === 'over' ? false : grounded,
-      phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
+      phase: ropes.ropes[0].theta + ropes.ropes[0].offset,   // the clock, not the warped angle:
+                                                             // the hands keep the beat, the rope
+                                                             // whips through it
       holding, spin: thrusting, dead,
       alt: y, ropeSpeed: u.ropeSpeed / BASE_SPEED, ropes: u.ropes,
       fuel: u.fuelMax ? u.fuel / u.fuelMax : 0,
@@ -872,11 +874,10 @@ export function createGame(stage) {
         y, vy, grounded, skips: u.skips, ropes: u.ropes, alt: u.altMax,
         speed: u.ropeSpeed, fuel: u.fuel, state, handY: hands[0].y, ropeBottom,
         holding, thrusting, down, paused, char: charId, cam: camDbg,
-        phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
-        // every live rope's absolute phase, not just the first one's: a bot timing N ropes
-        // cannot derive them from the offsets, because a reset parks a rope at PI - offset
-        // rather than PI + offset (rope.js:reset).
-        phases: ropes.ropes.filter((r) => r.active).map((r) => r.theta + r.offset),
+        phase: ropes.ropes[0].abs,
+        // every live rope's geometric angle, not just the first one's and not the clock: a bot
+        // times the rope it can see, and the warp (rope.js:warp) sets when each one is at her feet
+        phases: ropes.ropes.filter((r) => r.active).map((r) => r.abs),
         // which wipeout she is in, and where the body ended up: a fall that keeps travelling
         // is the bug this is here to catch
         fall: u.fall,

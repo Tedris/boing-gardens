@@ -136,12 +136,16 @@ is what keeps it readable at any rope count or height:
   The rope hangs from her hands, and matrices only refresh at draw time, so `game.js`
   adds the height gained since the last frame before asking where they are - at 100 m/s
   that is a two-metre error otherwise.
-  Extra ropes lag a quarter turn (`LAG`) behind the one before them, so at one revolution a
-  second the second rope arrives 0.25 s later - still inside the same hop, which is what makes
-  a second rope mean more skips rather than one thicker rope. Past three ropes the step tightens
-  so the last pass still lands inside one held hop (`HOP_SPAN`). A rope joining mid-run is
-  parked off the live sweep, because its own angle froze at the last reset and would otherwise
-  land it at the top of the arc whenever the card happened to be picked.
+  It does not turn evenly: the rope's angle is the hand clock warped by `WHIP*sin(clock)`, so
+  the sweep hangs overhead where it can be read - 60% of the descent instead of 50% - and then
+  snaps past the feet, which cuts the threat window from 117 ms to 83 ms. The beat is untouched:
+  a pass still lands on the same instant, and the hands keep the unwrapped clock, which is what
+  makes the whip read as the rope's inertia instead of a stutter.
+  All the ropes turn one shared clock and differ only by their offset, which holds the whole
+  group inside `BUNDLE` - 0.23 s, one tap's worth of air, so a rope picked up is more skips per
+  hop and never a second rhythm to survive. Six ropes cross at 0, 3, 5, 8, 11 and 14 frames into
+  the beat and pay six skips for one hop. A rope joining mid-run needs no parking, only the turn
+  of immunity it cannot have earned yet.
 - `world.js` - a dark stage that reads as one: a dusty floor slab, skyline silhouettes that
   swap as she climbs, a cloud band that recycles around the camera, sky that fades to space
   with stars tiering in above it. All altitude-driven, and the sky colour it returns *is*
@@ -225,7 +229,8 @@ changes how a wipeout looks, which is the whole cost.
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
-| `rope.js` | `LAG`, `HOP_SPAN` | rope spacing: a quarter turn apart, tightened so every pass fits inside one held hop |
+| `rope.js` | `WHIP` | how far the sweep hangs aloft before it snaps past the feet |
+| `rope.js` | `BUNDLE` | the span of time the group passes inside: one tap's worth of air |
 | `rope.js` | `JOIN_SETTLE`, `BACK_SETTLE` | turns a new rope, or a rope that survived a loss, cannot end the run |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
@@ -256,3 +261,12 @@ sits. Picking a card at 16 XP left XP at 16 and moved the threshold to 32, so no
 the top of a level is thrown away. The fuel column read empty with no braid owned and full the
 moment one was, in cyan against the rose ladder, and the ladder fades out on the roster and the
 card screen, where the same strip of screen belongs to the hint line.
+
+Sweep timing was measured the same way, off the rope angles the collision code itself reads. With
+the sweep parked at the top by `reset`, one hop at a known frame clears a whole group and the
+crossings land at 30 (one rope), 17 and 30 (two), 16, 23, 30 (three), and 16, 19, 21, 24, 27, 30
+(six): 233 ms of spread whatever the count, and skips equal to the number of ropes for that one
+hop. Before the shared clock the same test put the second rope at 45 - after the hop had landed -
+and could not get three ropes across at all, because each rope kept the lag it was parked with
+while the offsets shrank under it. The hang measures 18 of the 30 frames of the descent spent
+above the hand line, against 15 before, and a rope's threat window measures 83 ms against 117.
