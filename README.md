@@ -36,8 +36,10 @@ in should not end the run before you have heard where the rope falls. A settling
 faint, so it is obvious which one you are being let off.
 
 What a wipeout looks like is drawn on the spot - a crumple, a topple, a sit - so the same
-mistake does not look the same twice, and each one ends with her lying where she fell instead
-of twitching in place. A live rope skips the draw: she goes rigid, then flat.
+mistake does not look the same twice, and each one ends with her settled where she fell instead
+of twitching in place. A live rope skips the draw: a fourth pose, rigid first, then flat. The
+trip catches the rope at the bottom of its sweep, standing around her as a hoop at ankle height,
+so slack goes into it as she goes down and it lies along the dirt by the time the pose settles.
 
 The title opens the roster before it lets a run start, because the jumper is the first
 decision and there is no reason to hide it behind a menu: five of them, one rig. `C` or
