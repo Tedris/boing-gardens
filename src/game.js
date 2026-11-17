@@ -39,6 +39,8 @@ const CRIT_APEX = 0.32;    // a hop has to stay under this to count as a tight o
                            // reward - the shortest hop still passes 0.24 m over the rope, and
                            // every lower pass is a trip, so a low band pays nobody. The low
                            // build is the one with no margin, so it is the one that gets paid.
+const FALLS = ['crumple', 'topple', 'sit'];  // the shapes a wipeout can land in, picked at
+                                             // random so no two runs end the same way
 
 const BEST_KEY = 'boing-gardens-best';
 
@@ -160,10 +162,10 @@ export function createGame(stage) {
   function freshRun() {
     Object.assign(u, {
       jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, thrust: 0,
-      fuel: 0, fuelMax: 0, fire: 0, offer: 3, fallDrag: 1, landEase: 1,
+      fuel: 0, fuelMax: 0, live: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
       levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0,
-      alt: 0, altMax: 0, sinceSkip: 0, hopApex: 0,
+      alt: 0, altMax: 0, sinceSkip: 0, hopApex: 0, fall: '',
     });
     // who is jumping decides the starting numbers; cards stack on top of that
     who().apply(u);
@@ -240,7 +242,7 @@ export function createGame(stage) {
       el.mult.classList.remove('on');
     }
     el.pillNum.textContent = u.ropes;
-    el.cap.textContent = u.thrust > 0 ? 'FUEL' : 'ROPES';
+    el.cap.textContent = u.thrust > 0 ? 'SPIN' : 'ROPES';
     const prog = u.xp / Math.max(1, u.xpNeed);
     el.fill.style.height = `${Math.max(0, Math.min(1, u.thrust > 0 ? u.fuel / u.fuelMax : prog)) * 100}%`;
     el.alt.textContent = `${Math.floor(Math.max(0, y))} m`;
@@ -314,9 +316,14 @@ export function createGame(stage) {
     state = 'over';
     shake = 1;
     vy = 3.4;
+    // A live rope always ends it the same way; otherwise which fall she gets is drawn on the
+    // spot, once, so the same mistake does not look the same twice.
+    const fall = u.live > 0 ? 'shock' : FALLS[(Math.random() * FALLS.length) | 0];
+    char.fall(fall);
+    u.fall = fall;
+    if (fall === 'shock') sfx.zap();
     char.bump(-1.2, 0.6);
     sfx.fail();
-    sfx.fire(0);
     const best = Math.max(+(localStorage.getItem(BEST_KEY) || 0), u.skips);
     localStorage.setItem(BEST_KEY, String(best));
     el.title.innerHTML = 'WIPE<span>OUT</span>';
@@ -356,7 +363,8 @@ export function createGame(stage) {
   function applyCard(c) {
     u.levels[c.id] = (u.levels[c.id] ?? 0) + 1;
     c.apply(u);
-    // every pick tops up rocket fuel - the loop that keeps a run airborne
+    // every pick tops up the braid, which is the loop that keeps a run airborne - and so does
+    // touching the ground, see the landing below
     if (u.thrust > 0) u.fuel = u.fuelMax;
     ropes.setCount(u.ropes);
   }
@@ -598,6 +606,12 @@ export function createGame(stage) {
         if (!grounded) {
           grounded = true;
           u.hopApex = 0;      // the hop is over; the next one is measured from the floor
+          // The braid spins back up on the dirt. That is what makes the climb worth buying:
+          // fuel that only a card refill brought would last well under a second per pick, so
+          // the choice became "spend the upgrade", and now it is "spend the height you gained"
+          // - landing is the one moment the rope can take a rope off her, so the climb pays
+          // for itself by putting the danger where the game already keeps it.
+          if (u.thrust > 0) u.fuel = u.fuelMax;
           sfx.land(impact * u.landEase);
           char.bump(-impact * 0.075, 0.12);
           char.puff(0.0, 0.06, 0.15, 1.1);
@@ -637,8 +651,12 @@ export function createGame(stage) {
       // One revolution a second, and that rate is the whole story: nothing here speeds the
       // sweep up because the run got long. Rope speed is a card, so it changes when one says so.
       const speed = state === 'run' ? u.ropeSpeed : 0;
-      ropeBottom = ropes.update(state === 'run' ? dt : 0, {
-        hands, speed, length: ROPE_A, ground: 0, fire: u.fire > 0, time,
+      // A trip catches her at the bottom of the sweep, where the arc is a hoop standing at
+      // ankle height around the body that just fell. Slack goes into it as she goes down, so
+      // the rope lies along the dirt by the time the fall settles instead of framing her.
+      const slack = dead ? Math.min(0.34, deadT * 0.8) : 0;
+      ropeBottom = ropes.update(state === 'run' || state === 'over' ? dt : 0, {
+        hands, speed, length: ROPE_A + slack, ground: 0, live: u.live, time,
       });
 
       if (state === 'run') {
@@ -685,7 +703,6 @@ export function createGame(stage) {
           }
         }
         nearMiss = Math.max(0, nearMiss - dt);
-        sfx.fire(u.fire);
       }
     }
 
@@ -694,24 +711,22 @@ export function createGame(stage) {
       time, y, vy,
       grounded: state === 'over' ? false : grounded,
       phase: ropes.ropes[0].theta + ropes.ropes[0].offset,
-      holding, thrusting, dead, fire: u.fire,
+      holding, spin: thrusting, dead,
       alt: y, ropeSpeed: u.ropeSpeed / BASE_SPEED, ropes: u.ropes,
       fuel: u.fuelMax ? u.fuel / u.fuelMax : 0,
       nearMiss: nearMiss > 0, skipped: time - lastSkipT < 0.12,
     });
-    if (state === 'over') {
-      char.group.rotation.x = -Math.min(1.3, deadT * 2.1);
-      char.group.rotation.z = Math.min(0.5, deadT * 0.8);
-      char.group.position.x = Math.sin(deadT * 4) * deadT * 0.5;
-    } else {
-      char.group.rotation.set(0, 0, 0);
-      char.group.position.x = 0;
-    }
+    // The rope's hum and the braid's whup are loops with a gate, not one-shots, so they are
+    // told the truth every frame whether or not the run is still running. Both used to be
+    // updated from inside the run branch, which meant a wipeout left the rope humming under
+    // the game-over panel until the next run started.
+    sfx.live(state === 'run' ? u.live : 0);
+    sfx.whup(state === 'run' && thrusting ? Math.max(0.25, u.fuel) : 0);
 
     // ---------------- camera ----------------
     // Parked, not tracking: her height alone never moves the picture. The frame slides
-    // only when where the arc is *going* - this jump, the hold on top of it, the rocket
-    // burn, one chained air jump - would push her out of the band the body and the rope
+    // only when where the arc is *going* - this jump, the hold on top of it, the braid's
+    // climb, one chained air jump - would push her out of the band the body and the rope
     // need. Aiming at the predicted apex makes the move arrive before she does, so the
     // camera never chases her from behind. Everything the stage derives from height (sky,
     // fog, tiers, pullback) reads camY, so the world cannot disagree with the frame.
@@ -749,7 +764,7 @@ export function createGame(stage) {
     // The park's own motion is applied outright and only the step it had to take is eased:
     // chasing instead of following trails a fast rise by its speed over the ease rate, which
     // is enough to clip her head at the top of the frame. And when what is left of that ease
-    // is itself more than the band - a stacked-rocket run leaving the ground at a kilometre a
+    // is itself more than the band - a stacked-braid run leaving the ground at a kilometre a
     // second - the frame is put where the park says it belongs, because being late is the same
     // as being wrong.
     camY += Math.abs(gap) > topRoom ? gap
@@ -789,7 +804,7 @@ export function createGame(stage) {
     scene.fog.near = eye + 1;
     scene.fog.far = eye + 14 - space * 5;
 
-    world.update(dt, time, camPos.y, u.fire > 0 ? 1 : 0);
+    world.update(dt, time, camPos.y, u.live > 0 ? 1 : 0);
     el.flash.style.opacity = flash * 0.55;
     paintHud();
     pressEdge = false;
@@ -822,6 +837,11 @@ export function createGame(stage) {
         // cannot derive them from the offsets, because a reset parks a rope at PI - offset
         // rather than PI + offset (rope.js:reset).
         phases: ropes.ropes.filter((r) => r.active).map((r) => r.theta + r.offset),
+        // which wipeout she is in, and where the body ended up: a fall that keeps travelling
+        // is the bug this is here to catch
+        fall: u.fall,
+        pose: [Math.round(char.group.position.x * 1000) / 1000,
+          Math.round(char.group.rotation.z * 100) / 100, Math.round(char.group.rotation.x * 100) / 100],
         settle: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.settle * 100) / 100),
         xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed,
       };

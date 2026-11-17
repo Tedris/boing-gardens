@@ -22,17 +22,17 @@ export const CARDS = [
     level: (n) => `SPEED +${Math.round((Math.pow(1.14, n) - 1) * 100)}%`,
   },
   {
-    id: 'rocket', icon: '\u{1F680}', name: 'Rocket Laces', tier: 3,
-    blurb: 'Keep holding past the peak to burn fuel and climb. Refills on every pick.',
+    id: 'braid', icon: '\u{1F300}', name: 'Propeller Braid', tier: 3,
+    blurb: 'Wind the braid overhead and hold to climb. It spins back up the moment she lands.',
     max: 4,
     apply: (u) => { u.thrust += 6.5; u.fuelMax += 0.7; u.fuel = u.fuelMax; },
-    level: (n) => `THRUST ${n}`,
+    level: (n) => `LIFT ${n}`,
   },
   {
-    id: 'fire', icon: '\u{1F525}', name: 'Set It Alight', tier: 3,
-    blurb: 'The ropes catch fire. Everything they touch scores double.',
+    id: 'live', icon: '\u{1F50C}', name: 'Live Wire', tier: 3,
+    blurb: 'The ropes turn live. Everything they touch scores double, and a trip is a shock.',
     max: 3,
-    apply: (u) => { u.fire = Math.min(3, u.fire + 1); u.mult *= 2; },
+    apply: (u) => { u.live = Math.min(3, u.live + 1); u.mult *= 2; },
     level: (n) => `\u00D7${Math.pow(2, n)} SCORE`,
   },
   {

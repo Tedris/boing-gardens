@@ -123,9 +123,9 @@ export function createWorld() {
   return {
     group,
     skyColor,
-    /** camY = camera height; time = seconds. `fire` is unused on purpose: a burning
-     *  rope shows on the rope and its embers, and the world itself never glows for it. */
-    update(dt, time, camY, fire) {
+    /** camY = camera height; time = seconds. `live` is unused on purpose: a live rope shows on
+     *  the rope and its sparks, and the world itself never lights up for it. */
+    update(dt, time, camY, live) {
       // sky: the same colour the fog dissolves the horizon into
       skyColor.lerpColors(skyLow, skyHigh, THREE.MathUtils.smoothstep(camY, 40, 240));
 

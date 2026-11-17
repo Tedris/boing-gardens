@@ -1,7 +1,7 @@
 // Synthesised sound: no audio files, so nothing is borrowed and it still works
 // offline. Everything is short envelopes on oscillators plus filtered noise.
 let ctx = null, master = null, noiseBuf = null, muted = false;
-let fireSrc = null, fireGain = null;
+let liveSrc = null, liveGain = null, whupSrc = null, whupGain = null;
 
 function ensure() {
   if (ctx) return ctx;
@@ -17,18 +17,65 @@ function ensure() {
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
 
-  // looping fire bed, gated by gain
-  fireSrc = ctx.createBufferSource();
-  fireSrc.buffer = noiseBuf;
-  fireSrc.loop = true;
-  const bp = ctx.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = 780;
-  bp.Q.value = 0.8;
-  fireGain = ctx.createGain();
-  fireGain.gain.value = 0;
-  fireSrc.connect(bp).connect(fireGain).connect(master);
-  fireSrc.start();
+  // live-wire bed: a mains-like hum plus a crackle, made once and gated
+  // by gain, same shape the rotor bed below uses.
+  liveGain = ctx.createGain();
+  liveGain.gain.value = 0;
+  liveGain.connect(master);
+
+  const hum = ctx.createOscillator();
+  hum.type = 'sawtooth';
+  hum.frequency.value = 52;
+  const humLp = ctx.createBiquadFilter();
+  humLp.type = 'lowpass';
+  humLp.frequency.value = 340;
+  const humGain = ctx.createGain();
+  humGain.gain.value = 0.45;
+  hum.connect(humLp).connect(humGain).connect(liveGain);
+  hum.start();
+
+  // the crackle is looping noise squeezed through a gate a square LFO
+  // opens a few times a second; the slow sine on the LFO's pitch wobbles
+  // that rate so it crackles instead of ticking like a metronome.
+  liveSrc = ctx.createBufferSource();
+  liveSrc.buffer = noiseBuf;
+  liveSrc.loop = true;
+  const crk = ctx.createBiquadFilter();
+  crk.type = 'bandpass';
+  crk.frequency.value = 3100;
+  crk.Q.value = 0.9;
+  const crkGate = ctx.createGain();
+  crkGate.gain.value = 0.5;
+  const crkLfo = ctx.createOscillator();
+  crkLfo.type = 'square';
+  crkLfo.frequency.value = 6;
+  const crkDepth = ctx.createGain();
+  crkDepth.gain.value = 0.5;
+  const rateLfo = ctx.createOscillator();
+  rateLfo.frequency.value = 0.7;
+  const rateDepth = ctx.createGain();
+  rateDepth.gain.value = 2.5;
+  rateLfo.connect(rateDepth).connect(crkLfo.frequency);
+  crkLfo.connect(crkDepth).connect(crkGate.gain);
+  liveSrc.connect(crk).connect(crkGate).connect(liveGain);
+  rateLfo.start();
+  crkLfo.start();
+  liveSrc.start();
+
+  // rotor whup for the propeller braid: a sawtooth below hearing range is
+  // nothing but a pulse train, and its period is the blade pass; the
+  // lowpass softens it into a whup instead of a buzz.
+  whupSrc = ctx.createOscillator();
+  whupSrc.type = 'sawtooth';
+  whupSrc.frequency.value = 10.5;
+  const whupLp = ctx.createBiquadFilter();
+  whupLp.type = 'lowpass';
+  whupLp.frequency.value = 300;
+  whupLp.Q.value = 0.7;
+  whupGain = ctx.createGain();
+  whupGain.gain.value = 0;
+  whupSrc.connect(whupLp).connect(whupGain).connect(master);
+  whupSrc.start();
   return ctx;
 }
 
@@ -103,8 +150,21 @@ export const sfx = {
     tone(320, 0.5, { gain: 0.2, type: 'sawtooth', slide: -250 });
     noise(0.4, 340, 0.5, 0.13, 'lowpass');
   },
-  fire(level) {
-    if (!ctx || muted || !fireGain) return;
-    fireGain.gain.value = level * 0.05;
+  live(level) {
+    if (!ctx || muted || !liveGain) return;
+    liveGain.gain.value = [0, 0.03, 0.05, 0.07][Math.max(0, Math.min(3, level | 0))];
+  },
+  whup(level) {
+    if (!ctx || muted || !whupGain) return;
+    whupGain.gain.value = Math.max(0, Math.min(1, level)) * 0.05;
+  },
+  zap() {
+    if (!ctx || muted) return;
+    // a shock, not a sparkler: brighter than the skip tone, all its
+    // energy on the way down, and short enough to sit inside the fail
+    // thud it plays under.
+    tone(3600, 0.14, { gain: 0.11, type: 'square', slide: -3200 });
+    noise(0.09, 3000, 0.7, 0.07, 'highpass');
+    noise(0.16, 5200, 0.6, 0.05, 'highpass');
   },
 };

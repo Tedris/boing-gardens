@@ -71,6 +71,7 @@ export function createCharacter() {
   hips.position.y = P.hipY;
   body.add(hips);
   rig.hips = hips;
+  rig.hipsRest = P.hipY;   // a fall sinks her from here, so the built height is remembered
 
   const pelvis = part(box(0.34, 0.20, 0.26), C.shorts);
   pelvis.position.y = 0.02;
@@ -111,21 +112,7 @@ export function createCharacter() {
     lace.position.set(0, -0.005, 0.115);
     ankle.add(lace);
 
-    // rocket boots: three flat slabs, not a flame texture - fire at 240 rows is
-    // a stack of bright pixels, and additive blending would wash the grid out
-    const flame = new THREE.Group();
-    flame.position.y = -0.14;
-    flame.visible = false;
-    ankle.add(flame);
-    const flames = [];
-    [[C.fire, 0.15, 0], [C.fire, 0.11, -0.13], [C.rocket, 0.075, -0.26]].forEach(([col, w, y]) => {
-      const f = part(box(w, 0.12, w), col, { basic: true, fog: false, snap: false });
-      f.position.y = y;
-      flame.add(f);
-      flames.push(f);
-    });
-
-    leg.push({ thigh, knee, ankle, flame, flames });
+    leg.push({ thigh, knee, ankle });
   }
   rig.leg = leg;
 
@@ -236,7 +223,7 @@ export function createCharacter() {
     hair.add(s);
     sides.push(s);
   }
-  const clip = part(box(0.075, 0.03, 0.035), C.fire);
+  const clip = part(box(0.075, 0.03, 0.035), 0xd0576f);
   clip.position.set(0.16, 0.335, 0.16);
   clip.rotation.z = -0.4;
   hair.add(clip);
@@ -263,6 +250,29 @@ export function createCharacter() {
     strands.push({ root, segs, pitch: springState(), roll: springState(), phase: ax * 9 });
   }
   rig.strands = strands;
+
+  // The propeller braid: three short bars on a stem above the crown, wound fast enough to
+  // read as a disc. It hangs off `head`, not `hair`: a rope power-up that switches itself off
+  // for the row with no hair is a card that does nothing, and the roster has such a row. Cream
+  // like the rope rather than hair-dark, because the frame looks down at her by seven degrees
+  // - a flat dark blade is one pixel of nothing, and the whole joke needs to be visible. Each
+  // bar is pitched and the rotor sits off true, so the blades come up and over as they go
+  // round instead of sliding past as a single line.
+  const rotor = new THREE.Group();
+  rotor.position.y = 0.56;
+  rotor.rotation.x = 0.3;
+  rotor.visible = false;
+  head.add(rotor);
+  rig.rotor = rotor;
+  const rotorStem = part(box(0.055, 0.13, 0.055), C.hair);
+  rotorStem.position.y = -0.06;
+  rotor.add(rotorStem);
+  for (let k = 0; k < 3; k++) {
+    const blade = part(box(0.56, 0.09, 0.16), C.ropeA);
+    blade.rotation.y = (k * 2 * Math.PI) / 3;
+    blade.rotation.x = 0.34;
+    rotor.add(blade);
+  }
 
   // ---------------- the other look ----------------
   // One row of the roster has no hair at all: she is the jumper from the first web
@@ -366,7 +376,8 @@ export function createCharacter() {
   const sCrouch = springState();
   const sTuck = springState();
   const jig = springState();
-  let blink = 2.2, blinkT = 0, prevVy = 0, tumble = 0, tumbleV = 0;
+  let blink = 2.2, blinkT = 0, prevVy = 0, spinRpm = 0, rotorAngle = 0;
+  let fallKind = 'crumple', fallT = 0;   // which way she went down, and how long ago
 
   const hands = [];
   for (const a of rig.arm) {
@@ -407,6 +418,13 @@ export function createCharacter() {
     for (const st of strands) st.pitch.v += vy * 0.55;
   }
 
+  /** Which wipeout she is about to have. The game draws one at the trip so that the same
+   *  mistake does not look the same twice; `shock` is reserved for a live rope. */
+  function fall(kind) {
+    fallKind = FALL_POSE[kind] ? kind : 'crumple';
+    fallT = 0;
+  }
+
   function puff(x, y, z, spread = 0.5) {
     const p = puffs[puffNext++ % puffs.length];
     p.life = 1;
@@ -429,8 +447,26 @@ export function createCharacter() {
     tongue.position.set(0.02, -0.02, 0.005);
   }
 
+  /** Where each wipeout leaves her. `pitch` and `roll` are whole-body, because a fall has to
+   *  read from the camera's distance; the joints are where she ended up. Every value is a
+   *  resting pose rather than a motion: nothing here is still moving once the throw lands. */
+  const FALL_POSE = {
+    crumple: { pitch: 1.45, roll: 0.10, sink: 0.44, hips: -0.10, thigh: 0.95, knee: 1.20,
+      spread: 0.30, arm: -2.30, armOut: 0.20, elbow: 1.10, head: 0.45, headYaw: 0.20 },
+    topple: { pitch: 0.10, roll: 1.52, sink: 0.40, hips: 0.12, thigh: 0.40, knee: 0.55,
+      spread: 0.45, arm: -1.50, armOut: 0.50, elbow: 0.35, head: 0.30, headYaw: -0.30 },
+    // Sitting up means the arms come down: `armOut` rides on a base of 2.1, which splays the
+    // arms of a body lying on its side out along the dirt. A torso that is still upright has to
+    // pull that base back, or she sits with her hands in the air - and the rope, held by those
+    // hands, stands up around her as a hoop instead of lying where it fell.
+    sit: { pitch: 0.00, roll: 0.04, sink: 0.00, drop: 0.34, hips: -0.50, thigh: 0.95, knee: 0.55,
+      spread: 0.55, arm: 0.45, armOut: -1.75, elbow: 0.35, head: 0.55, headYaw: 0.10 },
+    shock: { pitch: 0.00, roll: 1.60, sink: 0.42, hips: 0.05, thigh: 0.05, knee: 0.08,
+      spread: 0.10, arm: -1.60, armOut: 1.10, elbow: 0.05, head: -0.35, headYaw: 0.35 },
+  };
+
   /**
-   * s = { time, y, vy, ay, grounded, phase, holding, thrust, dead, fire,
+   * s = { time, y, vy, ay, grounded, phase, holding, spin, dead,
    *       alt, ropeSpeed, ropes, fuel, nearMiss, skipped }
    */
   function update(dt, s) {
@@ -447,8 +483,8 @@ export function createCharacter() {
     const sq = clamp((stretch - crouch * 1.6) * look.squash, -0.34 * look.squash, 0.4);
     body.scale.set((1 - sq * 0.5) * look.w, (1 + sq) * look.h, (1 - sq * 0.5) * look.w);
 
-    // ---- lean from vertical motion and thrust ----
-    const leanTarget = clamp(vy * 0.017, -0.24, 0.3) + (s.thrust ? 0.42 : 0) + (s.dead ? 0.2 : 0);
+    // ---- lean from vertical motion and the braid's lift ----
+    const leanTarget = clamp(vy * 0.017, -0.24, 0.3) + (s.spin ? 0.08 : 0);
     const lean = springKick(sLean, leanTarget, -ay * J.body.g, J.body.k, J.body.d, dt);
     body.rotation.x = clamp(lean, -0.7, 0.9);
     body.rotation.z = springKick(sRoll, Math.sin(t * 1.4) * 0.02, -ay * 0.0018, 42, 8.5, dt);
@@ -457,37 +493,51 @@ export function createCharacter() {
     body.position.y = clamp(springKick(sBody, 0, -ay * J.body.g, J.body.k, J.body.d, dt), -BLOCK * 2, BLOCK * 2)
       + crouch * 0.55;
 
-    // ---- death: a ragdoll gag, not a simulation ----
+    // ---- the fall: a shape she settles into and then holds ----
+    // Not a ragdoll. A ragdoll integrates, and integrating forever is the twitching,
+    // side-to-side thing this used to do under the game-over panel for as long as the panel
+    // was up. Everything below is a function of fallT and stops at half a second, which is
+    // what "she stays where she fell" means in this file.
+    let f = null;
     if (s.dead) {
-      tumbleV += dt * 5.5;
-      tumble = Math.min(tumble + tumbleV * dt, 2.3);
+      fallT += dt;
+      f = FALL_POSE[fallKind];
+      const k = Math.min(1, fallT / 0.5);
+      const ease = 1 - Math.pow(1 - k, 3);                    // one throw...
+      const bounce = Math.sin(k * Math.PI) * (1 - k) * 0.2;   // ...and one damped bounce
+      // A live rope holds her rigid first: straight, tremoring, and only then let go.
+      const tremor = fallKind === 'shock'
+        ? Math.sin(fallT * 52) * 0.03 * Math.max(0, 1 - fallT / 0.3) : 0;
+      group.rotation.x = f.pitch * ease;
+      group.rotation.z = f.roll * (ease + bounce) + tremor;
+      group.rotation.y = tremor * 2;
+      hips.position.y = rig.hipsRest - f.sink * ease;
+      // A lying pose needs no drop: rotating the whole body about her feet carries the torso
+      // to the dirt by itself. One that keeps its torso upright has to be let down by the
+      // torso - `group.position.y` belongs to the physics, and the hips alone move the legs,
+      // so a sit with no drop is a body hovering at standing height over folded knees.
+      body.position.y -= (f.drop || 0) * ease;
     } else {
-      tumble = 0;
-      tumbleV = 0;
+      group.rotation.set(0, 0, 0);
+      hips.position.y = rig.hipsRest;
     }
-    rig.hips.rotation.x = lerp(rig.hips.rotation.x, s.dead ? 0.4 : -crouch * 0.9, 0.25);
+    group.position.x = 0;
+    rig.hips.rotation.x = lerp(rig.hips.rotation.x, s.dead ? f.hips : -crouch * 0.9, 0.25);
 
     // ---- tuck: knees up in the air, planted on the ground ----
     const tuck = spring(sTuck, s.grounded && !s.dead ? 0 : 1, 70, 12, dt);
-    const rag = s.dead ? 1 : 0;
     leg.forEach((L, i) => {
-      const wob = Math.sin(t * 2.1 + i * 2.2) * 0.03;
-      L.thigh.rotation.x = lerp(L.thigh.rotation.x, -0.62 * tuck + (s.thrust ? 1.15 : 0) + crouch * 0.7 + wob, 0.22);
       // on the ground the legs stand slightly open, so the feet sit under the hips instead of
       // knocking inward at the knee; the tuck reverses it in the air, where knees together is
       // the shape you want.
-      L.thigh.rotation.z = lerp(L.thigh.rotation.z, (i ? -1 : 1) * (tuck * 0.14 - 0.045 + rag * 0.5), 0.2);
-      L.knee.rotation.x = lerp(L.knee.rotation.x, 0.95 * tuck - crouch * 1.5 + (s.thrust ? -0.35 : 0), 0.22);
+      const open = (i ? -1 : 1) * (tuck * 0.14 - 0.045);
+      L.thigh.rotation.x = lerp(L.thigh.rotation.x, s.dead
+        ? f.thigh
+        : -0.62 * tuck + (s.spin ? 0.3 : 0) + crouch * 0.7 + Math.sin(t * 2.1 + i * 2.2) * 0.03, 0.22);
+      L.thigh.rotation.z = lerp(L.thigh.rotation.z, s.dead ? (i ? -1 : 1) * f.spread : open, 0.2);
+      L.knee.rotation.x = lerp(L.knee.rotation.x, s.dead
+        ? f.knee : 0.95 * tuck - crouch * 1.5 + (s.spin ? 0.45 : 0), 0.22);
       L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.35 * tuck + crouch * 0.9, 0.2);
-      L.flame.visible = !!s.thrust;
-      if (s.thrust) {
-        const f = 0.8 + Math.sin(t * 34 + i * 2) * 0.22;
-        L.flames.forEach((m, k) => {
-          m.scale.set(1, f * (0.7 + s.fuel * 0.6) * (1 - k * 0.18), 1);
-          m.visible = k === 0 || s.fuel > 0.25 * k;
-        });
-        if (Math.random() < 0.3) puff(0, -0.1, 0, 0.9);
-      }
     });
 
     // ---- arms: the hands anchor to the swing the rope hangs from, so the arm
@@ -495,8 +545,10 @@ export function createCharacter() {
     const ph = s.phase;
     for (const a of arm) {
       if (s.dead) {
-        a.shoulder.rotation.set(-1.2 + Math.sin(t * 9 + a.sx) * 0.5, 0, a.sx * 2.1);
-        a.elbow.rotation.set(0.7, 0, 0);
+        // to the shape the fall left them in, and held: a sine on a body that has finished
+        // moving is the difference between a wipeout and a glitch
+        a.shoulder.rotation.set(f.arm, 0, a.sx * (2.1 + f.armOut));
+        a.elbow.rotation.set(f.elbow, 0, 0);
         continue;
       }
       a.wrist.rotation.x = 0.2 * Math.sin(ph);
@@ -504,24 +556,35 @@ export function createCharacter() {
     }
 
     // ---- head keeps its own balance so the face stays readable ----
-    headPivot.rotation.x = clamp(springKick(sNod, -lean * 0.55, -ay * 0.006, 90, 11, dt), -0.6, 0.6);
-    headPivot.rotation.z = -body.rotation.z * 0.7 + Math.sin(t * 1.7) * 0.02;
-    headPivot.rotation.y = Math.sin(ph) * 0.09 + (s.dead ? Math.sin(t * 3) * 0.1 : 0);
-    chest.scale.setScalar(1 + Math.sin(t * 2.4) * 0.01);
+    headPivot.rotation.x = s.dead
+      ? lerp(headPivot.rotation.x, f.head, 0.18)
+      : clamp(springKick(sNod, -lean * 0.55, -ay * 0.006, 90, 11, dt), -0.6, 0.6);
+    headPivot.rotation.z = -body.rotation.z * 0.7 + (s.dead ? 0 : Math.sin(t * 1.7) * 0.02);
+    headPivot.rotation.y = s.dead ? f.headYaw : Math.sin(ph) * 0.09;
+    chest.scale.setScalar(1 + (s.dead ? 0 : Math.sin(t * 2.4) * 0.01));
 
     // ---- hair: gravity and acceleration set each root's target angle ----
     const hang = clamp(0.5 + ay * 0.014, -1.2, 2.0);
+    const alive = s.dead ? 0 : 1;
+    // The braid as a rotor: it winds up while she holds and runs down when she lets go, so a
+    // climb that dries out slows in front of her instead of switching off, and the downwash
+    // lifts the strands of the bob on the way past.
+    spinRpm = lerp(spinRpm, s.spin ? 1 : 0, Math.min(1, dt * (s.spin ? 7 : 2.4)));
+    rotorAngle += dt * (5 + 44 * spinRpm * (0.4 + s.fuel * 0.6));
+    rotor.visible = spinRpm > 0.02;
+    rotor.rotation.y = rotorAngle;
+    rotor.rotation.z = 0.06 * Math.sin(t * 3.1) * spinRpm;   // it wobbles like a fan wound too fast
     strands.forEach((st) => {
-      st.pitch.v += ((-lean * 0.7 - hang * 0.28) - st.pitch.p) * J.hair.k * dt;
+      st.pitch.v += ((-lean * 0.7 - hang * 0.28 + spinRpm * 0.9) - st.pitch.p) * J.hair.k * dt;
       st.pitch.v -= st.pitch.v * J.hair.d * dt;
       st.pitch.p = clamp(st.pitch.p + st.pitch.v * dt, -J.hair.max, J.hair.max);
-      st.roll.v += ((-body.rotation.z * 1.6 + Math.sin(t * 2.6 + st.phase) * 0.05) - st.roll.p) * 70 * dt;
+      st.roll.v += ((-body.rotation.z * 1.6 + Math.sin(t * 2.6 + st.phase) * 0.05 * alive) - st.roll.p) * 70 * dt;
       st.roll.v -= st.roll.v * 8.5 * dt;
       st.roll.p += st.roll.v * dt;
       st.root.rotation.set(st.pitch.p * look.jig, 0, st.roll.p);
       st.segs.forEach((g, k) => {
         g.rotation.x = st.pitch.p * (0.35 + k * 0.22) * 0.6 * look.jig;
-        g.rotation.y = Math.sin(t * 3.1 + st.phase + k) * 0.06;
+        g.rotation.y = Math.sin(t * 3.1 + st.phase + k) * 0.06 * alive;
       });
     });
 
@@ -576,8 +639,8 @@ export function createCharacter() {
       b.m.position.y = lerp(b.m.position.y, 0.325 + browLift * 0.02, 0.2);
     });
 
-    if (s.dead) setFace('dizzy');
-    else if (s.thrust) setFace('panic');
+    if (s.dead) setFace(fallKind === 'shock' && fallT < 0.55 ? 'o' : 'dizzy');
+    else if (s.spin) setFace('o');
     else if (s.nearMiss) setFace('grit');
     else if (Math.abs(vy) > 9) setFace('panic');
     else if (s.alt > 90) setFace('o');
@@ -614,5 +677,6 @@ export function createCharacter() {
     bump,
     puff,
     setFace,
+    fall,
   };
 }

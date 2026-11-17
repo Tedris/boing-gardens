@@ -19,7 +19,7 @@ One button does everything: space / up / W / click / tap.
 | Input   | Effect                                                  |
 | ------- | ------------------------------------------------------- |
 | Press   | leave the ground; the press that starts a run is its first jump |
-| Hold    | stay up longer on the way up; burn rocket fuel in the air |
+| Hold    | stay up longer on the way up; wind the braid and climb on the way down |
 | Release | let the arc fall                                         |
 | 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |
 | 1 – 5     | pick a jumper on the roster panel (on touch, tap the card)   |
@@ -34,6 +34,10 @@ has just joined the sweep gets one turn of that rule suspended, and the ropes th
 loss get half one (`rope.js:JOIN_SETTLE`, `BACK_SETTLE`), because a sweep you were never swept
 in should not end the run before you have heard where the rope falls. A settling rope is drawn
 faint, so it is obvious which one you are being let off.
+
+What a wipeout looks like is drawn on the spot - a crumple, a topple, a sit - so the same
+mistake does not look the same twice, and each one ends with her lying where she fell instead
+of twitching in place. A live rope skips the draw: she goes rigid, then flat.
 
 The title opens the roster before it lets a run start, because the jumper is the first
 decision and there is no reason to hide it behind a menu: five of them, one rig. `C` or
@@ -160,15 +164,17 @@ drifting the way a counting-up curve does. A hop that never left the ground much
 one and pays double (`game.js:CRIT_APEX`): a tap peaks at 0.276 m against 0.49 m for a held
 hop, so the payout goes to the play with the least margin, and it levels twice as fast. Each
 level offers three randomly drawn cards from ten, and you keep one. Cards stack: jump height,
-extra ropes, rope speed, rocket laces, fire, better draws, slower falls, wider timing, a
-mid-air hop, and a running multiplier. Rope speed is on that list and nowhere else: the sweep
-holds one revolution a second for the whole run, so the timing learned on the first jump is
-still true at minute nine.
+extra ropes, rope speed, a propeller braid, live wires, better draws, slower falls, wider
+timing, a mid-air hop, and a running multiplier. Rope speed is on that list and nowhere else:
+the sweep holds one revolution a second for the whole run, so the timing learned on the first
+jump is still true at minute nine.
 
-Rockets refill on every pick, which is the trick that turns the game from a jump-and-time
-loop into a hover-and-dodge loop. There is no meta-progression and no unlock tree: every
-run starts from the same numbers, other than the ones the jumper you picked brought with
-her. Nothing you earn carries between runs.
+The braid is what turns the game from a jump-and-time loop into a climb-and-land loop, and it
+spins back up every time she touches the ground - not only on a pick, which left it with well
+under a second of climb per upgrade and nothing to say for itself. Buying it is the choice to
+spend height instead of luck: the climb is free until she has to come down, and coming down is
+the one moment the rope can take a rope off her. A live wire doubles what the rope pays and
+changes how a wipeout looks, which is the whole cost.
 
 ## Staying clear of anyone's IP
 
@@ -211,10 +217,10 @@ her. Nothing you earn carries between runs.
 
 No build step and no test suite; behaviour was verified in a browser at 1024x707: title →
 roster → pick by key → run → level-up draft → card pick by key → trip → game over → restart,
-five jumpers, three ropes with fire, and 700 m frames driven through
+five jumpers, three ropes turned live, and 700 m frames driven through
 `window.game.script.fly()`. Framing was measured the same way, as her feet against the frame
 centre: eight plain hops with no cards moved the frame 1 cm in total, and a six-metre jump, a
-rocket climb and a 350 m fall each kept her inside the band the camera is parked for (-2.7 to
+braid climb and a 350 m fall each kept her inside the band the camera is parked for (-2.7 to
 +0.85 m). `window.game.debug` exposes live state (`y`, `vy`, `phase`, `phases`, `settle`, `xp`,
 `skips`, `state`, `char`) and `debug.cam` the frame's own decisions (`lo`, `hi`, `up`, `down`,
 `follow`, `a`); `window.game.script` drives input, grants cards and teleports, which is how

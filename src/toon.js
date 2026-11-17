@@ -49,8 +49,8 @@ export const C = {
   ropeA:   0xf2ecd2,   // cream: unlit and fog-exempt so the sweep stays the brightest thing on screen
   hedge:   0x27402f,
   star:    0xcfd6e0,
-  fire:    0xd8823a,
-  rocket:  0x7b86c4,
+  spark:   0xa8ecff,   // a live rope: pale enough cyan to read as white where a spark dies,
+                       // and the only cold colour anywhere on her
   sky:     0x232c38,   // fog colour, so the horizon dissolves instead of ending
   skyHi:   0x121822,   // the same sky after most of the air has gone
   floor:   0x35433d,

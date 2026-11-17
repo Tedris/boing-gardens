@@ -51,7 +51,7 @@ export function createRopes() {
   // two faces and therefore two values, which is what the whole look is
   const segGeo = new THREE.BoxGeometry(1, 1, 1);
   const plain = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
-  const burning = new THREE.MeshBasicMaterial({ color: C.fire, fog: false });
+  const energised = new THREE.MeshBasicMaterial({ color: C.spark, fog: false });
   // a rope that is still finding its place in the sweep, drawn faint so it is obvious which
   // one you are being let off
   const warming = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0.45 });
@@ -77,24 +77,26 @@ export function createRopes() {
     });
   }
 
-  // embers shed by burning ropes: ordinary squares, no additive blending, because
-  // additive light washes out the dither pattern it would be sitting on
+  // sparks thrown by a live rope: ordinary squares, no additive blending, because additive
+  // light washes out the dither pattern they would be sitting on. They are the only thing that
+  // says "electric" on the rope itself, so they leave along the arc instead of drifting up the
+  // way a fire's embers would, and they die in a fraction of the time.
   const NE = 140;
   const ePos = new Float32Array(NE * 3);
   const eVel = new Float32Array(NE * 3);
   const eLife = new Float32Array(NE);
   const eGeo = new THREE.BufferGeometry();
   eGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
-  const embers = new THREE.Points(eGeo, new THREE.PointsMaterial({
-    color: C.fire, size: 0.055, transparent: true, opacity: 0.9,
+  const sparks = new THREE.Points(eGeo, new THREE.PointsMaterial({
+    color: C.spark, size: 0.045, transparent: true, opacity: 0.95,
     depthWrite: false, fog: false, toneMapped: false,
   }));
-  embers.frustumCulled = false;
-  embers.visible = false;
-  group.add(embers);
+  sparks.frustumCulled = false;
+  sparks.visible = false;
+  group.add(sparks);
   let eNext = 0;
 
-  /** Keep n ropes live; spread their phases so each one asks for its own jump. */
+  /** Keep n ropes running; spread their phases so each one asks for its own jump. */
   function setCount(n) {
     // A quarter turn between ropes: 0.25 s at the base cadence, which sits inside one hop, so
     // an added rope means more skips per jump instead of one thicker rope, or a jump you have
@@ -167,14 +169,15 @@ export function createRopes() {
     ropes,
     setCount,
     /**
-     * s = { hands:[Vector3,Vector3], speed, fire, ground, time,
+     * s = { hands:[Vector3,Vector3], speed, live, ground, time,
      *       length }  length = hand-to-ground reach + slack
      * Returns the lowest point any rope reaches this frame.
      */
     update(dt, s) {
       const { hands, speed, length, ground } = s;
       let lowest = Infinity;
-      let anyFire = false;
+      let sparking = false;
+      const live = !!s.live;
 
       for (const r of ropes) {
         if (!r.active) continue;
@@ -191,32 +194,32 @@ export function createRopes() {
         // settling is counted in turns, not seconds: a fast sweep and a slow one offer the
         // same number of passes to learn where the rope falls
         if (r.settle > 0) r.settle -= (speed * dt) / (Math.PI * 2);
-        const lit = !!s.fire;
-        r.beads.material = lit ? burning : (r.settle > 0 ? warming : plain);
-        if (lit) {
-          anyFire = true;
-          // shed embers from the low front of the arc
-          if (Math.random() < 0.35) {
-            const p = pts[(K * 0.25 + Math.random() * K * 0.5) | 0];
+        r.beads.material = live ? energised : (r.settle > 0 ? warming : plain);
+        if (live && speed > 0) {
+          sparking = true;
+          // throw sparks off the fast part of the arc, along its own direction of travel
+          if (Math.random() < 0.5) {
+            const k = (K * 0.15 + Math.random() * K * 0.6) | 0;
+            const p = pts[k], q = pts[Math.min(K, k + 1)];
             const i3 = eNext++ % NE;
-            ePos[i3 * 3] = p.x; ePos[i3 * 3 + 1] = p.y; ePos[i3 * 3 + 2] = p.z * 0.6;
-            eVel[i3 * 3] = (Math.random() - 0.5) * 0.5;
-            eVel[i3 * 3 + 1] = 0.6 + Math.random() * 1.1;
-            eVel[i3 * 3 + 2] = (Math.random() - 0.5) * 0.5;
+            ePos[i3 * 3] = p.x; ePos[i3 * 3 + 1] = p.y; ePos[i3 * 3 + 2] = p.z;
+            eVel[i3 * 3] = (p.x - q.x) * 9 + (Math.random() - 0.5) * 1.6;
+            eVel[i3 * 3 + 1] = (p.y - q.y) * 9 + 0.4 + Math.random() * 0.8;
+            eVel[i3 * 3 + 2] = (p.z - q.z) * 9 + (Math.random() - 0.5) * 1.6;
             eLife[i3] = 1;
           }
         }
       }
 
-      embers.visible = anyFire;
-      if (anyFire) {
+      sparks.visible = sparking;
+      if (sparking) {
         for (let i = 0; i < NE; i++) {
           if (eLife[i] <= 0) {
             ePos[i * 3 + 1] = -999;
             continue;
           }
-          eLife[i] -= dt * 1.5;
-          eVel[i * 3 + 1] -= dt * 1.4;
+          eLife[i] -= dt * 4.5;
+          eVel[i * 3 + 1] -= dt * 5.5;
           ePos[i * 3] += eVel[i * 3] * dt;
           ePos[i * 3 + 1] += eVel[i * 3 + 1] * dt;
           ePos[i * 3 + 2] += eVel[i * 3 + 2] * dt;
