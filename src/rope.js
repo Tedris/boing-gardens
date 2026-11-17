@@ -17,7 +17,8 @@ const BOW = 1.35;       // extra lateral spread aloft, added at the mid-rope. It
                         // quarter-points of the loop out past the handle line; most of the
                         // loop's width is the hand spread itself (character.js handX), since
                         // the ends of the arc are pinned to the handles.
-const MAXR = 6;          // rope ceiling
+export const MAX = 6;    // rope ceiling, and the only one: the bundle is spaced across this many,
+                         // and cards.js stops offering Another Rope once this many are turning
 const WHIP = 0.42;       // how far the sweep hangs overhead and then snaps through the bottom. The
                          // rope's geometric angle is the hand clock warped by WHIP*sin(clock): it
                          // dwells at the top where it can be read, arrives fast, and spends less
@@ -83,7 +84,7 @@ export function createRopes() {
   const pts = [];
   for (let i = 0; i <= K; i++) pts.push(new THREE.Vector3());
 
-  for (let i = 0; i < MAXR; i++) {
+  for (let i = 0; i < MAX; i++) {
     const segs = new THREE.InstancedMesh(segGeo, plain, K);
     segs.frustumCulled = false;
     const [a, b] = PAIRS[i % PAIRS.length];
@@ -132,7 +133,7 @@ export function createRopes() {
     // what keeps the passes apart as stripes rather than one thick rope, and it tightens as the
     // group grows so the span between the first and the last pass stays BUNDLE whatever n is.
     const step = (Math.PI * 2) * BUNDLE / turn / Math.max(1, n - 1);
-    for (let i = 0; i < MAXR; i++) {
+    for (let i = 0; i < MAX; i++) {
       const r = ropes[i];
       const was = r.active;
       r.active = i < n;

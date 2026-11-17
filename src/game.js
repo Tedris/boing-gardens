@@ -165,7 +165,7 @@ export function createGame(stage) {
   const u = {};
   function freshRun() {
     Object.assign(u, {
-      jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, thrust: 0,
+      jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, ropesMax: 1, thrust: 0,
       fuel: 0, fuelMax: 0, live: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
       levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0, critChance: CRIT_BASE,
@@ -246,7 +246,9 @@ export function createGame(stage) {
       el.mult.classList.remove('on');
     }
     el.alt.textContent = `${Math.floor(Math.max(0, y))} m`;
-    el.pillNum.textContent = u.ropes;
+    // the ropes turning, and when the run has lost one the number it could be back at: a lost
+    // rope has to be visible without a toast going past to say it
+    el.pillNum.textContent = u.ropes < u.ropesMax ? `${u.ropes}/${u.ropesMax}` : u.ropes;
     el.cap.textContent = u.thrust > 0 ? 'SPIN' : 'ROPES';
     // The right-edge bar is the braid's fuel and nothing else. It used to carry XP when there
     // was no braid, which made one gauge mean two different things depending on the last card
@@ -369,7 +371,7 @@ export function createGame(stage) {
       d.innerHTML =
         `<div class="ic">${c.icon}</div><div class="nm">${c.name}</div>` +
         `<div class="ds">${c.blurb}</div>` +
-        `<div class="lv">${c.level(n + 1)}</div>` +
+        `<div class="lv">${c.level(n + 1, u)}</div>` +
         `<div class="key">PRESS ${i + 1}</div>`;
       d.onclick = () => takeCard(i);
       el.row.appendChild(d);
@@ -386,6 +388,7 @@ export function createGame(stage) {
     // every pick tops up the braid, which is the loop that keeps a run airborne - and so does
     // touching the ground, see the landing below
     if (u.thrust > 0) u.fuel = u.fuelMax;
+    if (u.ropes > u.ropesMax) u.ropesMax = u.ropes;   // the high-water mark of the run
     ropes.setCount(u.ropes);
   }
 
@@ -879,7 +882,7 @@ export function createGame(stage) {
         pose: [Math.round(char.group.position.x * 1000) / 1000,
           Math.round(char.group.rotation.z * 100) / 100, Math.round(char.group.rotation.x * 100) / 100],
         settle: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.settle * 100) / 100),
-        xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed, crit: u.critChance,
+        xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed, crit: u.critChance, ropesMax: u.ropesMax,
       };
     },
     /** drive the game from a script (used for automated checks) */

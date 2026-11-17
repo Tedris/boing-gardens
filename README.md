@@ -35,6 +35,15 @@ loss get half one (`rope.js:JOIN_SETTLE`, `BACK_SETTLE`), because a sweep you we
 in should not end the run before you have heard where the rope falls. A settling rope is drawn
 faint, so it is obvious which one you are being let off.
 
+The rope count is kept two ways: how many are turning, and the most the run has had. The right-edge
+readout shows `3/6` while the run is under its own high-water mark, so a lost rope stays visible
+after the toast has gone, and Another Rope stays in the draft while a rope can still be added. The
+ceiling is the six the bundle is spaced across (`rope.js:MAX`) rather than a count of cards, which
+is what makes the card worth taking after a bad patch instead of something you had spent your way
+out of. The reference publishes no ceiling at all - the store copy says only that a card adds a
+rope, and a player reported carrying past seventy in one run - so six is this build's own choice,
+and it is the most that still reads as separate stripes rather than one wide rope.
+
 What a wipeout looks like is drawn on the spot - a crumple, a topple, a sit - so the same
 mistake does not look the same twice, and each one ends with her settled where she fell instead
 of twitching in place. A live rope skips the draw: a fourth pose, rigid first, then flat. A
@@ -236,6 +245,7 @@ changes how a wipeout looks, which is the whole cost.
 | `rope.js` | `BUNDLE` | the span of time the group passes inside: one tap's worth of air |
 | `rope.js` | `AT_START` | where the sweep waits between runs, which sets how long the opening arc has to be |
 | `rope.js` | `JOIN_SETTLE`, `BACK_SETTLE` | turns a new rope, or a rope that survived a loss, cannot end the run |
+| `rope.js` | `MAX` | the rope ceiling: how many the bundle is spaced across, and where Another Rope stops being offered |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the eleven upgrades and their numbers |
@@ -288,3 +298,11 @@ tripped the run at 0.63 s. Turns measure 80 frames exactly, the beat is one skip
 and a level still costs 12 skips, which the scripted player reached at 14 s against the 16 s the
 pacing is solved for. Six ropes still clear in one hop with the span unchanged, because `BUNDLE`
 spaced in seconds does not care what a turn costs.
+
+Rope accounting was read through an actual trip rather than a scripted number: six ropes bought one
+pick at a time, then left alone until the sweep took three of them, which the readout reported as
+`3/6` and the run carried on with three turning. The next Another Rope made it four and left the
+high-water mark at six. With all five copies already owned and four ropes turning, the draft still
+handed the card over - labelled 5 ROPES, the count it hands over rather than the copies spent - and
+taking it restored one. At six turning, 400 draws never offered it, and still filled three cards
+every time.
