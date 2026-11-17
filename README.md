@@ -164,17 +164,29 @@ The only soft parts left are the bob strands, one scarf and one body spring
 ## Loop
 
 Skips raise a level - XP does, and XP is its own number rather than a mark on the skip count,
-so a skip can be worth more than one. The next threshold is solved from the live skip rate,
-one skip per rope per revolution (`game.js:LEVEL_TIME`, 16 s), so a build with more ropes or a
-faster sweep earns it out of more skips and the wait between picks holds still instead of
-drifting the way a counting-up curve does. A hop that never left the ground much is a tight
-one and pays double (`game.js:CRIT_APEX`): a tap peaks at 0.276 m against 0.49 m for a held
-hop, so the payout goes to the play with the least margin, and it levels twice as fast. Each
-level offers three randomly drawn cards from ten, and you keep one. Cards stack: jump height,
-extra ropes, rope speed, a propeller braid, live wires, better draws, slower falls, wider
-timing, a mid-air hop, and a running multiplier. Rope speed is on that list and nowhere else:
-the sweep holds one revolution a second for the whole run, so the timing learned on the first
-jump is still true at minute nine.
+so a skip can be worth more than one. XP is never spent and never reset: the threshold moves up
+to meet it, which is what lets the bar be drawn across three levels at once
+(`game.js:XP_WINDOW`) with a tick at each boundary and the level count sitting above it, where a
+level is acknowledged. The next threshold is solved from the live skip rate, one skip per rope
+per revolution (`game.js:LEVEL_TIME`, 16 s), so a build with more ropes or a faster sweep earns
+it out of more skips and the wait between picks holds still instead of drifting the way a
+counting-up curve does. A hop that never left the ground much is a tight one and pays more
+(`game.js:CRIT_APEX`): a tap peaks at 0.276 m against 0.49 m for a held hop, so the payout goes
+to the play with the least margin, and the number it pays rides on the label so a build can see
+it. Crit Caliper is the one card that pays in experience instead of height, speed or survival.
+Each level offers three randomly drawn cards from eleven, and you keep one. Cards stack: jump
+height, extra ropes, rope speed, a propeller braid, live wires, better draws, slower falls,
+wider timing, a mid-air hop, a running multiplier, and the crit payout. Rope speed is on that
+list and nowhere else: the
+sweep holds one revolution a second for the whole run, so the timing learned on the first jump
+is still true at minute nine.
+
+Two gauges, deliberately unlike each other, because they answer different questions. The
+experience ladder runs along the bottom in rose and only exists while she is jumping: it is the
+one thing that tells you how far the next pick is. The braid's fuel is the blocked cyan column
+on the right edge, under the rope count, and it carries nothing else - it used to stand in for
+XP whenever no braid had been bought, which made one bar mean two different things depending on
+the last card taken.
 
 The braid is what turns the game from a jump-and-time loop into a climb-and-land loop, and it
 spins back up every time she touches the ground - not only on a pick, which left it with well
@@ -208,7 +220,7 @@ changes how a wipeout looks, which is the whole cost.
 | `game.js` | `BASE_SPEED` | sweep cadence: one revolution a second |
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
-| `game.js` | `LEVEL_TIME`, `CRIT_APEX` | the wait a level is solved for, and the hop height a tight skip has to stay under |
+| `game.js` | `LEVEL_TIME`, `CRIT_APEX`, `XP_WINDOW` | the wait a level is solved for, the hop height a tight skip has to stay under, and how many levels the XP bar is drawn across |
 | `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
@@ -217,7 +229,7 @@ changes how a wipeout looks, which is the whole cost.
 | `rope.js` | `JOIN_SETTLE`, `BACK_SETTLE` | turns a new rope, or a rope that survived a loss, cannot end the run |
 | `character.js` | `J` | hair and body springs: stiffness, damping, travel in snap blocks |
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
-| `cards.js` | `CARDS` | the ten upgrades and their numbers |
+| `cards.js` | `CARDS` | the eleven upgrades and their numbers |
 | `roster.js` | `ROSTER` | the five jumpers: look and blurb, and no numbers of their own |
 
 ## Checks
@@ -236,3 +248,11 @@ same way, against a scripted player: picks at 15, 15.6, 15.9 and 16 s over a 75 
 picked up a rope and a speed card; 33 skips in 40 s with 97% of them tight, which is a pick
 every 8 s, against 31 skips and no tight ones at all for the held line; and a rope granted
 mid-sweep surviving its first turn, where it used to end the run inside a second.
+
+The two gauges were read off the same scripted player: the ladder measured 2.08%, 8.33% and
+27.08% at 1, 4 and 13 XP against a 16-skip level - the whole bar is three levels wide - and
+33.33% at the moment a level landed, which is the first tick, where the next level's threshold
+sits. Picking a card at 16 XP left XP at 16 and moved the threshold to 32, so nothing earned at
+the top of a level is thrown away. The fuel column read empty with no braid owned and full the
+moment one was, in cyan against the rose ladder, and the ladder fades out on the roster and the
+card screen, where the same strip of screen belongs to the hint line.

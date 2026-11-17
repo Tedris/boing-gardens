@@ -1,4 +1,4 @@
-// Ten upgrade cards. Each one edits the same run parameters the physics loop
+// Eleven upgrade cards. Each one edits the same run parameters the physics loop
 // reads, so stacking is just multiplication on shared state - no per-card hooks
 // scattered through the engine.
 export const CARDS = [
@@ -68,6 +68,16 @@ export const CARDS = [
     max: 4,
     apply: (u) => { u.combo += 1; },
     level: (n) => `+${(n * 0.35).toFixed(2)} / SKIP`,
+  },
+  {
+    // The one card that pays in experience instead of height, speed or survival. Every other
+    // card raises the skip rate, which raises the threshold with it (see levelGap); this one
+    // moves picks closer without touching the physics the rope reads.
+    id: 'crit', icon: '\u{1F3AF}', name: 'Crit Caliper', tier: 1,
+    blurb: 'A hop that stays low is a CRIT. Pay those out in experience, and pay them bigger.',
+    max: 4,
+    apply: (u) => { u.critXp += 1; },
+    level: (n) => `CRIT +${n + 2} XP`,
   },
 ];
 

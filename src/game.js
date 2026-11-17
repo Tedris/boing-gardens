@@ -39,6 +39,11 @@ const CRIT_APEX = 0.32;    // a hop has to stay under this to count as a tight o
                            // reward - the shortest hop still passes 0.24 m over the rope, and
                            // every lower pass is a trip, so a low band pays nobody. The low
                            // build is the one with no margin, so it is the one that gets paid.
+const XP_WINDOW = 3;       // the XP bar is drawn across this many levels: the one she is in and
+                           // the two it runs into, so the ladder ahead is on the gauge rather than
+                           // a bar that empties every level. Later gaps are assumed to repeat the
+                           // current one, which is a forecast and not a promise - a rope or a
+                           // faster sweep re-solves the next threshold when it is reached.
 const FALLS = ['crumple', 'topple', 'sit'];  // the shapes a wipeout can land in, picked at
                                              // random so no two runs end the same way
 
@@ -119,6 +124,9 @@ export function createGame(stage) {
     pillNum: document.querySelector('#pill .num'),
     fill: document.querySelector('#pill .fill'),
     cap: document.getElementById('pillcap'),
+    xp: document.getElementById('xp'),
+    xpFill: document.querySelector('#xp .fill'),
+    xpLvl: document.querySelector('#xp .lvl'),
     owned: document.getElementById('owned'),
     alt: document.querySelector('#alt b'),
     hint: document.getElementById('hint'),
@@ -164,7 +172,7 @@ export function createGame(stage) {
       jumpV: JUMP_V, ropeSpeed: BASE_SPEED, ropes: 1, thrust: 0,
       fuel: 0, fuelMax: 0, live: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
-      levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0,
+      levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0, critXp: 2,
       alt: 0, altMax: 0, sinceSkip: 0, hopApex: 0, fall: '',
     });
     // the numbers are the same for every jumper; only the cards ever move them
@@ -187,6 +195,7 @@ export function createGame(stage) {
   let pressEdge = false, down = false;
   let stumbled = false;        // a trip costs at most one rope per frame
   let hintT = 0, lostHint = false;   // the "ropes left" hint times itself out
+  let xpShown = -1;             // the LVL readout is written when it changes, not every frame
   let paused = false;        // freezes step() wholesale; see setPause
   let camY = 1.05, camZ = 8.8, time = 0, ropeBottom = 0.014, camAnchor = 0;
   // the camera's own live numbers, next to the physics ones: what the park window is,
@@ -240,16 +249,32 @@ export function createGame(stage) {
     } else {
       el.mult.classList.remove('on');
     }
+    el.alt.textContent = `${Math.floor(Math.max(0, y))} m`;
     el.pillNum.textContent = u.ropes;
     el.cap.textContent = u.thrust > 0 ? 'SPIN' : 'ROPES';
-    const prog = u.xp / Math.max(1, u.xpNeed);
-    el.fill.style.height = `${Math.max(0, Math.min(1, u.thrust > 0 ? u.fuel / u.fuelMax : prog)) * 100}%`;
-    el.alt.textContent = `${Math.floor(Math.max(0, y))} m`;
+    // The right-edge bar is the braid's fuel and nothing else. It used to carry XP when there
+    // was no braid, which made one gauge mean two different things depending on the last card
+    // taken - and fuel draining upward next to the rope count is its own instrument.
+    el.fill.style.height = `${(u.thrust > 0 ? Math.max(0, Math.min(1, u.fuel / Math.max(0.001, u.fuelMax))) : 0) * 100}%`;
+    // XP is cumulative, so the bar can show the levels ahead instead of restarting: the span is
+    // the next three thresholds, and the two ticks on it are where they fall.
+    const gap = Math.max(1, levelGap());
+    const from = u.xpNeed - gap;
+    el.xpFill.style.width = `${Math.max(0, Math.min(1, (u.xp - from) / (gap * XP_WINDOW))) * 100}%`;
+    if (xpShown !== u.level) {
+      xpShown = u.level;
+      el.xpLvl.innerHTML = `LVL<b>${u.level}</b>`;
+    }
+    // a run instrument: the roster, the card screen and the hint line all use this strip of the
+    // screen, so the ladder is only on the air while she is actually jumping
+    el.xp.classList.toggle('live', state === 'run' || state === 'ready');
   }
 
-  /** A tight skip: the label flies off the counter and a ping sits over the skip tone. */
-  function critFlash() {
+  /** A tight skip: the label flies off the counter and a ping sits over the skip tone. It says
+      what the crit paid, because the Crit Caliper changes that number mid-run. */
+  function critFlash(paid) {
     sfx.crit();
+    el.crit.textContent = paid > 1 ? `CRIT +${paid}` : 'CRIT';
     el.crit.classList.remove('on');
     void el.crit.offsetWidth;   // restart the flight when tight skips come in a run
     el.crit.classList.add('on');
@@ -374,8 +399,13 @@ export function createGame(stage) {
     if (!c) return;
     applyCard(c);
     u.level++;
-    u.xp = 0;
-    u.xpNeed = levelGap();
+    // XP is not reset: the threshold moves up to meet it, so an over-eager skip at the top of a
+    // level is not thrown away and the bar can show what the next levels will cost.
+    u.xpNeed += levelGap();
+    el.xp.classList.remove('up');
+    void el.xp.offsetWidth;     // one bump per level, even when two land in the same second
+    el.xp.classList.add('up');
+    setTimeout(() => el.xp.classList.remove('up'), 620);   // the bump is a moment, not a state
     bumpChip(c.id);
     sfx.pick();
     el.draft.classList.remove('on');
@@ -697,8 +727,8 @@ export function createGame(stage) {
               // with the least room to spare, and the flash and the ping are what teach that the
               // band exists at all.
               const crit = u.hopApex < CRIT_APEX;
-              u.xp += crit ? 2 : 1;
-              if (crit) critFlash();
+              u.xp += crit ? u.critXp : 1;
+              if (crit) critFlash(u.critXp);
               sfx.skip(u.skips);
               char.bump(0.4, 0.25);
               el.skips.classList.add('pop');

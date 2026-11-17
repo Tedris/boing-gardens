@@ -11,7 +11,8 @@
   See README.md for the design/legal notes.
 
   Look: PS1-era pixel pass, flat slate HUD. Small plain sans, thin 1px rules, no
-  outlines, no shadows, generous empty space. The only accent is rose.
+  outlines, no shadows, generous empty space. Two colours only: rose for experience, and
+  the live-wire cyan for the braid's fuel - the two gauges have to be told apart at a glance.
 -->
 <style>
   :root{
@@ -22,7 +23,8 @@
     --label:#8b97a8;              /* small caps labels, muted voice */
     --value:#e8e6dd;              /* cream, every number and headline */
     --body:#c7c6be;               /* running copy sits a step under the values */
-    --accent:#c94f6d;             /* rose: the only colour in the UI */
+    --accent:#c94f6d;             /* rose: experience, and everything else that is paid out */
+    --spin:#a8ecff;               /* the live-wire cyan: fuel in the braid, nothing else */
     --ctl:34px;                   /* corner button size */
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -37,7 +39,7 @@
   /* explicit layers: an accelerated canvas with z-index:auto can drift above the
      DOM panels depending on the compositor, which puts her through the text */
   #stage{position:fixed;inset:0;z-index:0;touch-action:none}
-  #skips,#pill,#owned,#alt,#hint,#mute,#pause,#swap{z-index:5}
+  #skips,#pill,#xp,#owned,#alt,#hint,#mute,#pause,#swap{z-index:5}
   #flash{z-index:8}
   /* the pixel pass happens in WebGL at 240 rows; the browser must not smooth it away */
   #stage canvas{display:block;width:100%;height:100%;touch-action:none;image-rendering:pixelated}
@@ -84,18 +86,24 @@
   }
   #mult.on{opacity:1}
 
-  /* ---- rope-count meter, right edge ---- */
+  /* ---- braid fuel, right edge ---- */
   #pill{
     position:fixed;right:calc(2.6vw + env(safe-area-inset-right));top:14vh;height:56vh;width:30px;
     display:flex;flex-direction:column;align-items:center;pointer-events:none;
   }
+  /* A blocked column, not a hairline: fuel is read from the corner of an eye while the rope is
+     coming round, and it is the only thing this bar carries now that XP has its own gauge. */
   #pill .bar{
-    position:absolute;left:50%;top:34px;bottom:26px;width:2px;margin-left:-1px;
+    position:absolute;left:50%;top:34px;bottom:26px;width:9px;margin-left:-4.5px;
     background:var(--track);overflow:hidden;
+  }
+  #pill .bar::after{
+    content:'';position:absolute;inset:0;
+    background:repeating-linear-gradient(to top,transparent 0 9px,var(--panel) 9px 12px);
   }
   #pill .fill{
     position:absolute;bottom:0;left:0;right:0;height:0%;
-    background:var(--accent);transition:height .18s linear;
+    background:var(--spin);transition:height .18s linear;
   }
   #pill .num{
     position:relative;z-index:1;min-width:26px;height:24px;padding:0 6px;
@@ -103,6 +111,37 @@
     display:grid;place-items:center;font-size:12px;
   }
   #pill .cap{position:relative;z-index:1;margin-top:auto;font-size:10px;letter-spacing:.2em;color:var(--label)}
+
+  /* ---- experience ladder, under her feet ---- */
+  /* Cumulative XP across three levels, so the bar holds the levels ahead of this one and the two
+     ticks are where they fall. Thin, horizontal, rose: nothing like the blocked cyan column the
+     braid burns on the right edge, which is the whole reason they are drawn apart. */
+  #xp{
+    position:fixed;left:50%;bottom:calc(3vh + env(safe-area-inset-bottom));transform:translateX(-50%);
+    width:min(42vw,380px);pointer-events:none;
+    /* a run instrument only: the roster and the level-up cards own the bottom of the screen
+       while they are up, and the hint line lives on this same line */
+    opacity:0;transition:opacity .35s ease-out;
+  }
+  #xp.live{opacity:1}
+  #xp .lvl{font-size:10px;letter-spacing:.24em;color:var(--label)}
+  #xp .lvl b{
+    display:inline-block;margin-left:7px;font-size:14px;font-weight:500;letter-spacing:.02em;
+    color:var(--value);
+  }
+  #xp .bar{position:relative;height:5px;margin-top:6px;background:var(--track);border:1px solid var(--line)}
+  #xp .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width .18s linear}
+  #xp .tick{position:absolute;top:-2px;bottom:-2px;width:1px;margin-left:-.5px;background:var(--hi)}
+  /* the count above the bar is where a level gets acknowledged: it is the one number that says
+     the run went up, and the bar itself only ever slides along */
+  #xp.up .lvl b{animation:xppop .55s ease-out}
+  #xp.up .bar{animation:xprule .55s ease-out}
+  @keyframes xppop{
+    0%{transform:scale(1);color:var(--value)}
+    20%{transform:scale(1.55);color:var(--accent)}
+    100%{transform:scale(1);color:var(--value)}
+  }
+  @keyframes xprule{0%{border-color:var(--accent)}100%{border-color:var(--line)}}
 
   /* ---- owned cards ---- */
   #owned{
@@ -274,6 +313,13 @@
     #screen .stats b{font-size:19px}
     #screen .go{margin-top:24px;font-size:11px;letter-spacing:.26em}
     #screen .legal{margin-top:20px;font-size:9px;line-height:1.7}
+    /* the bottom strip of a portrait phone is crowded: the corner buttons own its right and the
+       hint the line above, so the ladder sits left-aligned on the bottom edge, under the altitude */
+    #hint{bottom:calc(2vh + 44px + env(safe-area-inset-bottom))}
+    #xp{
+      left:calc(2.4vw + env(safe-area-inset-left));transform:none;
+      width:min(58vw,300px);bottom:calc(2vh + env(safe-area-inset-bottom));
+    }
   }
 
   /* Landscape phones are short: the title panel has to stay above the notch and
@@ -301,7 +347,14 @@
     #pill{height:66vh;top:16vh}
     #alt{bottom:calc(5vh + env(safe-area-inset-bottom))}
     #alt b{font-size:15px}
-    #hint{bottom:calc(4vh + env(safe-area-inset-bottom));font-size:10px}
+    /* the bottom strip of a phone is crowded: the corner buttons own the right of it and the
+       hint the line above, so the ladder sits left-aligned on the very bottom edge, under the
+       altitude readout and clear of both */
+    #hint{bottom:calc(2vh + 44px + env(safe-area-inset-bottom));font-size:10px}
+    #xp{
+      left:calc(2.4vw + env(safe-area-inset-left));transform:none;
+      width:min(58vw,300px);bottom:calc(2vh + env(safe-area-inset-bottom));
+    }
   }
 </style>
 </head>
@@ -314,6 +367,15 @@
     <div class="bar"><div class="fill"></div></div>
     <div class="num">1</div>
     <div class="cap" id="pillcap">ROPES</div>
+  </div>
+
+  <div id="xp">
+    <div class="lvl">LVL<b>1</b></div>
+    <div class="bar">
+      <div class="fill"></div>
+      <div class="tick" style="left:33.333%"></div>
+      <div class="tick" style="left:66.666%"></div>
+    </div>
   </div>
 
   <div id="owned"></div>
