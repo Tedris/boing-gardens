@@ -37,7 +37,7 @@ export const CARDS = [
   },
   {
     id: 'braid', icon: '\u{1F300}', name: 'Propeller Braid', tier: 3,
-    blurb: 'Wind the braid overhead and hold to climb. It spins back up the moment she lands.',
+    blurb: 'Wind the braid overhead and hold to climb. The jump sets how fast that climb goes.',
     apply: (u) => { u.thrust += 6.5; u.fuelMax += 0.7; u.fuel = u.fuelMax; },
     level: (n) => `LIFT ${n}`,
   },
@@ -71,7 +71,7 @@ export const CARDS = [
   },
   {
     id: 'wind', icon: '\u{1F98B}', name: 'Second Wind', tier: 2,
-    blurb: 'Press again in mid-air for one extra hop.',
+    blurb: 'Press again on the way down for one extra hop. A press while rising costs nothing.',
     apply: (u) => { u.airJumps += 1; },
     level: (n) => `${n} MID-AIR HOPS`,
   },

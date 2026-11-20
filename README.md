@@ -225,6 +225,16 @@ spend height instead of luck: the climb is free until she has to come down, and 
 the one moment the rope can take a rope off her. A live wire doubles what the rope pays and
 changes how a wipeout looks, which is the whole cost.
 
+What the braid pays falls off with climb speed and pays nothing above `HOVER_K * jumpV`
+(`game.js:hoverA`), so past the point where it beats gravity it holds her up rather than throwing
+her up: the climb travels at a speed the jump sets. That tie is what keeps the rest of the deck in
+the run. Left flat, four copies of the card were simply a bigger gravity - the arc stopped being an
+arc, and every card that edits the arc went quiet with it, the mid-air hop included, whose whole
+rule is that it replaces a fall. With the ceiling tied to `jumpV`, Higher Soles is the lever on the
+climb again and Second Wind fires the moment she comes down, which is when a hop has something to
+replace. A braid that cannot beat gravity - one copy to three - has nothing to taper and stays the
+lift assist it always was.
+
 ## Winning, and what it leaves behind
 
 There is one goal and it is a height: 260 m (`game.js:WIN_H`). The number is not a threshold picked
@@ -286,6 +296,7 @@ has nowhere to be shown, so the first touch of storage removes the key that held
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
 | `game.js` | `VY_MAX`, `ASCEND_DRAG` | the speed a climb tops out at, and how hard the air takes the excess back |
+| `game.js` | `HOVER_K` | the braid's ceiling in multiples of the launch speed: how fast a hover climbs, and why jump height raises it |
 | `game.js` | `FALL_DRAG_MIN` | how slow a fall may be slowed to, which is what keeps the descent arriving on the beat |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
 | `rope.js` | `WHIP` | how far the sweep hangs aloft before it snaps past the feet |
@@ -364,13 +375,26 @@ each one were stacked on a fresh run and the button was mashed - a press edge on
 seconds of it - and nothing produced a NaN or an error, or a run the player could not finish. What
 that took was two numbers, not two ceilings on cards. Ascent stops paying above 26 m/s (`VY_MAX`,
 handed straight back as drag by `ASCEND_DRAG`, and stated once so the integrator and the camera's
-arc prediction cannot disagree about it), because thrust and fuel both grow with every Propeller
-Braid and their product is the speed a climb ends at: twenty of them climbed 153 m under mashing
-and were back on the dirt 297 frames after the mashing stopped, and twelve of everything peaked at
-191 m and came down in 8 s. And a mid-air hop replaces the fall instead of adding to it - summed,
-twenty Second Winds left the ground at 74 m/s, which is tens of thousands of metres in a run and a
-descent that outlasts it. Ordinary play never reaches either term: a mid-run tap still peaks at
-0.311 m and is off the ground for 0.317 s, and turns still measure 80 frames.
+arc prediction cannot disagree about it), and the braid's lift stops paying at `HOVER_K * jumpV`,
+because thrust and fuel both grow with every Propeller Braid and their product is the speed a climb
+ends at: twenty of everything, mashed for five seconds, peaked at 174 m and was back on the dirt
+12.5 s after the button was let go, and twelve of everything peaked at 151 m and came down in 7.2 s.
+And a mid-air hop replaces the fall instead of adding to it - summed, twenty Second Winds left the
+ground at 74 m/s, which is tens of thousands of metres in a run and a descent that outlasts it.
+Ordinary play never reaches either term: a mid-run tap still peaks at 0.311 m and is off the ground
+for 0.317 s, and turns still measure 80 frames.
+
+The braid's ceiling was read against the cards it used to silence, each of them one held press from
+a standing start with the level timer pinned so no draft broke the arc. A plain hop peaks at 0.7 m
+and Higher Soles x5 at 2.6 m; one braid lifts those to 1.3 m and 3.9 m, so both cards are still
+readable on the arc. Four braids then climb 54.7 m in six seconds at 9.3 m/s against an 8.4 m/s
+ceiling, and the same build with five Higher Soles in it covers 87.7 m at 15.8 m/s against 17.6 -
+the jump sets the climb now, which is the stacking the flat version destroyed. Second Wind was read
+where it had been dead: pressed at 9.2 s of a four-braid climb, once the fuel had run out, `vy` went
+from -22.0 to +1.9 with the gate at 3.04, so the hop took. A press while she is still rising takes
+nothing and spends nothing, which is the same rule that keeps twenty Second Winds from becoming a
+rocket, and the card says so on its face. And the goal is still at the end of the climb: eight
+braids held through one press reach 260 m in 24.4 s, the same eight with five Higher Soles in 15 s.
 
 What the deck does bound is the draw. With Four-Leaf Sneaker taken past eight copies the draft has
 nothing left to add, so it shows all eleven cards in two wrapped rows keyed 1 to 9, then 0, then -;

@@ -27,6 +27,13 @@ const VY_MAX = 26;           // ascent stops paying for itself here. Nothing in 
                              // takes minutes of nothing happening.
 const ASCEND_DRAG = 20;      // how hard that ceiling is enforced: lift past VY_MAX is handed straight
                              // back, which is what air does
+const HOVER_K = 2.2;         // the braid's ceiling, in multiples of the launch speed. Past it the
+                             // propeller pays only what gravity costs, so it holds her up rather
+                             // than throwing her upward: four copies stop inverting gravity and
+                             // become a long hover at a speed the jump sets, which is what lets a
+                             // Higher Soles stack raise the climb with the arc instead of the braid
+                             // replacing it. Below VY_MAX until the jump itself is stacked deep,
+                             // where that clamp takes over as the hard stop.
 const FALL_DRAG_MIN = 0.35;  // the floor on Puffy Overalls' fall drag. Drag is reduced gravity on
                              // the way down, and gravity is what makes the descent arrive: below a
                              // third of it a hop hangs for seconds, she is still in the air when the
@@ -36,6 +43,19 @@ const FALL_DRAG_MIN = 0.35;  // the floor on Puffy Overalls' fall drag. Drag is 
 /** The ascent ceiling, stated once so the integrator and the camera's arc prediction cannot
     disagree about it (game.js:arcY). Zero for anything a run reaches by skipping. */
 const ascendA = (v) => -ASCEND_DRAG * Math.max(0, v - VY_MAX);
+
+/** What the braid pays at a given climb speed: its whole thrust at the bottom of the arc, and down
+    to exactly the cost of gravity at the hover ceiling - so the ceiling is the speed she climbs at,
+    not a speed the lift merely stops adding to. A braid that cannot beat gravity has nothing to
+    taper and stays the lift assist it always was; on the way down it pays in full, because the
+    braid fights a fall rather than amplifying one. Stated once so the integrator and the camera's
+    arc prediction cannot disagree about it, for the same reason as ascendA (game.js:arcY). */
+const hoverA = (v, u) => {
+  const net = u.thrust - G;                     // what the braid keeps after gravity
+  if (net <= 0) return u.thrust;
+  return u.thrust - net * Math.max(0, Math.min(1, v / (HOVER_K * u.jumpV)));
+};
+
 const JUMP_V = 3.8;          // a tap: ~0.31m apex, ~0.32s off the ground - over the sweep with a
                              // little headroom, and back down with the revolution still running
 const HOLD_LIFT = 13.2;      // extra upward accel while holding, which is what turns that tap
@@ -70,8 +90,8 @@ const XP_WINDOW = 3;       // the XP bar is drawn across this many levels: the o
 // arrived at here (world.js:BANDS stops at 150 m and the stars tier in above that), so by the
 // time she reaches it the stage has nothing left to show her: the win is the place the scenery
 // was already built to stop, not a number invented for a trophy. Crossing it ends the run
-// (game.js:winRun). Twenty braids under a mashing thumb climb 153 m, so this is a good run
-// rather than a routine one, and the height board is what keeps the runs that fell short.
+// (game.js:winRun). Eight braids held through one press get there in 24 s, so this is a build
+// rather than a reflex, and the height board is what keeps the runs that fell short.
 const WIN_H = 260;         // metres
 
 const FALLS = ['crumple', 'topple', 'sit'];  // the shapes a wipeout can land in, picked at
@@ -633,7 +653,10 @@ export function createGame(stage) {
   // on a landing point a hundred metres down did. Two-segment closed form, sampled: gravity
   // plus whatever hold assist or burn is still owed, for exactly as long as it is owed.
   function arcY(t) {
-    const lift = (holding ? u.holdLift : 0) + (thrusting ? u.thrust : 0);
+    // The burn's own lift falls away as the arc approaches the hover ceiling, so the prediction
+    // reads it at the speed she has now - which overestimates the climb, the safe direction for a
+    // frame that would rather arrive before she does than after.
+    const lift = (holding ? u.holdLift : 0) + (thrusting ? hoverA(vy, u) : 0);
     const owed = Math.min(LOOK_AHEAD, Math.max(
       holding ? Math.max(0, u.holdMax - holdT) : 0,
       thrusting ? u.fuel * Math.max(0.2, u.fuelMax) : 0));
@@ -728,7 +751,7 @@ export function createGame(stage) {
       // run get one assist window each, never two stacked on the same arc.
       if (launchT > 0 && !grounded) { a += u.holdLift; launchT = Math.max(0, launchT - dt) }
       else if (holding) a += u.holdLift;
-      if (thrusting) a += u.thrust;
+      if (thrusting) a += hoverA(vy, u);   // tapering to the hover ceiling, not a flat climb
       a += ascendA(vy);
       vy += a * dt;
       y += vy * dt;
