@@ -10,6 +10,14 @@
     the skip path (game.js), and the card below only ever moves this number. */
 export const CRIT_BASE = 0.10;
 const CRIT_STEP = 0.10;    // what one Crit Caliper adds: four of them makes a crit every other skip
+
+/** Seconds of burn one Propeller Braid buys, so the card's own arithmetic is the gauge: four
+    copies are 7.8 s of climb. It used to be 0.7 of an abstract tank drained at a rate proportional
+    to the tank's size, which made a burn last the square of the copies - 31 s at eight, and a win
+    that was really a key held down. What tops the climb out is game.js:HOVER_K, and a press on the
+    beat buys a second back (game.js:IGNITE). */
+export const FUEL_S = 1.95;
+
 export const CARDS = [
   {
     id: 'soles', icon: '\u{1F45F}', name: 'Higher Soles', tier: 0,
@@ -37,9 +45,9 @@ export const CARDS = [
   },
   {
     id: 'braid', icon: '\u{1F300}', name: 'Propeller Braid', tier: 3,
-    blurb: 'Wind the braid overhead and hold to climb. The jump sets how fast that climb goes.',
-    apply: (u) => { u.thrust += 6.5; u.fuelMax += 0.7; u.fuel = u.fuelMax; },
-    level: (n) => `LIFT ${n}`,
+    blurb: 'Hold to climb; press as a rope passes to burn longer. Jump height sets the speed.',
+    apply: (u) => { u.thrust += 6.5; u.fuelMax += FUEL_S; u.fuel = u.fuelMax; },
+    level: (n) => `${(FUEL_S * n).toFixed(1)} s AIR`,
   },
   {
     id: 'live', icon: '\u{1F50C}', name: 'Live Wire', tier: 3,
@@ -77,7 +85,7 @@ export const CARDS = [
   },
   {
     id: 'crown', icon: '\u{1F451}', name: 'Combo Crown', tier: 2,
-    blurb: 'A long run pays. The multiplier climbs with every skip you survive.',
+    blurb: 'A clean run pays. The multiplier is skips since you last lost a rope.',
     apply: (u) => { u.combo += 1; },
     level: (n) => `+${(n * 0.35).toFixed(2)} / SKIP`,
   },

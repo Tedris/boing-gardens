@@ -20,11 +20,11 @@ const KEY_LABEL = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'];
 
 const G = 23.5;              // gravity, m/s^2
 const VY_MAX = 26;           // ascent stops paying for itself here. Nothing in ordinary play comes
-                             // close - a tap leaves the ground at 3.8 - but thrust and fuel both
-                             // grow with every Propeller Braid, so the speed the climb ends at,
-                             // which is their product, grows with the square of the copies. Left
-                             // alone a deep braid stack leaves the atmosphere and the fall back
-                             // takes minutes of nothing happening.
+                             // close - a tap leaves the ground at 3.8 - but the braid's ceiling is
+                             // HOVER_K * jumpV, and a Higher Soles stack raises that ceiling until
+                             // this clamp is the one holding the climb down (game.js:hoverA). A
+                             // climb that outran it left the atmosphere and took minutes of nothing
+                             // happening to come back down.
 const ASCEND_DRAG = 20;      // how hard that ceiling is enforced: lift past VY_MAX is handed straight
                              // back, which is what air does
 const HOVER_K = 2.2;         // the braid's ceiling, in multiples of the launch speed. Past it the
@@ -72,6 +72,19 @@ const ROPE_W = 0.38;         // radians around bottom that count as "rope at the
                              // short-airtime jumpers (game.js:launchT), which is an invariant
                              // with a commit behind it; being forgiving at the edges is the
                              // better side to be wrong on.
+// A press that misses is held this long, so the frame she lands on is still the jump she asked
+// for. A pass is a 117 ms window and a press a few frames early used to be read as no press at
+// all, which ends a run for timing that was early rather than wrong. It cannot buy her a rope:
+// the press only replays on the dirt, and she still had to be off the floor when the sweep came
+// round (game.js:step).
+const BUFFER = 0.05;
+// The braid's beat. One press per revolution counts, and it counts only inside this much of a rope
+// at her feet - half the danger window below, and in the whip's fastest part, so the tighter ask
+// of the two - and buys this many seconds of burn against a tank that is draining all the way up.
+// A revolution costs 1.33 s of burn and a clean press pays 1.0 of it, so leaning on the key still
+// runs the tank dry: the way to the top is to keep time with the rope.
+const IGNITE = 1.0;
+const IGN_W = ROPE_W * 0.5;
 const BASE_SPEED = (Math.PI * 2) * 0.75;  // three revolutions every four seconds: faster and the
                                            // base hop lands on the sweep, slower and the rope
                                            // stops driving - and at this rate the hop and the
@@ -90,8 +103,8 @@ const XP_WINDOW = 3;       // the XP bar is drawn across this many levels: the o
 // arrived at here (world.js:BANDS stops at 150 m and the stars tier in above that), so by the
 // time she reaches it the stage has nothing left to show her: the win is the place the scenery
 // was already built to stop, not a number invented for a trophy. Crossing it ends the run
-// (game.js:winRun). Eight braids held through one press get there in 24 s, so this is a build
-// rather than a reflex, and the height board is what keeps the runs that fell short.
+// (game.js:winRun). Held through one press eight braids fall 92 m short of it; pressed so the
+// braid refuels on the beat, six get there in 26 s, so this is a build rather than a reflex.
 const WIN_H = 260;         // metres
 
 const FALLS = ['crumple', 'topple', 'sit'];  // the shapes a wipeout can land in, picked at
@@ -224,7 +237,7 @@ export function createGame(stage) {
       fuel: 0, fuelMax: 0, live: 0, offer: 3, fallDrag: 1, landEase: 1,
       grace: 0, airJumps: 0, combo: 0, mult: 1, holdLift: HOLD_LIFT, holdMax: HOLD_MAX,
       levels: {}, skips: 0, score: 0, level: 1, xp: 0, xpNeed: 0, critChance: CRIT_BASE,
-      alt: 0, altMax: 0, sinceSkip: 0, fall: '',
+      alt: 0, altMax: 0, sinceSkip: 0, streak: 0, fall: '',
     });
     // the numbers are the same for every jumper; only the cards ever move them
     u.xpNeed = levelGap();   // the first threshold, off the sweep rate
@@ -232,6 +245,7 @@ export function createGame(stage) {
     camAnchor = 0; camY = 1.05;   // a new run frames the ground, not the last run's ceiling
     airLeft = 0; thrusting = false; dead = false; deadT = 0; won = false;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
+    bufferT = 0; armed = true; lastBeat = 0;
     stumbled = false; hintT = 0; lostHint = false;
     paused = false; el.paused.classList.remove('on');
     ropes.setCount(1);
@@ -244,6 +258,8 @@ export function createGame(stage) {
   let airLeft = 0, thrusting = false, dead = false, deadT = 0, won = false;
   let shake = 0, flash = 0, nearMiss = 0, lastSkipT = -9;
   let pressEdge = false, down = false;
+  let bufferT = 0;           // a press waiting for the landing it was meant for (BUFFER)
+  let armed = true, lastBeat = 0;   // one braid ignition per revolution of the sweep
   let stumbled = false;        // a trip costs at most one rope per frame
   let hintT = 0, lostHint = false;   // the "ropes left" hint times itself out
   let xpShown = -1;             // the LVL readout is written when it changes, not every frame
@@ -309,8 +325,11 @@ export function createGame(stage) {
     return Math.max(4, Math.round(LEVEL_TIME * u.ropes * u.ropeSpeed / (Math.PI * 2)));
   }
 
+  /** The multiplier is a streak, not an odometer: the ladder is skips since the last rope she
+      lost, so the cushion and the score are the same number spent two ways. Losing a rope used to
+      cost one rope and nothing else, which made a safe run win by lasting. */
   function multiplier() {
-    return u.mult * (1 + u.combo * Math.min(3, u.skips / 45));
+    return u.mult * (1 + u.combo * Math.min(3, u.streak / 45));
   }
 
   function paintHud() {
@@ -395,6 +414,7 @@ export function createGame(stage) {
       rope count the only cushion in the game, and Another Rope the way to buy it. */
   function loseRope() {
     u.ropes--;
+    u.streak = 0;      // this is the only thing that breaks the multiplier, on purpose
     ropes.setCount(u.ropes);
     ropes.reset(true);      // recovering: the survivors are re-spaced, so they get a half turn
     vy = STUMBLE_VY; grounded = false; holdT = 0; thrusting = false;
@@ -629,7 +649,7 @@ export function createGame(stage) {
     if (paused === on) return;
     if (!on) {
       paused = false;
-      down = false; pressEdge = false;
+      down = false; pressEdge = false; bufferT = 0;
       el.paused.classList.remove('on');
       return;
     }
@@ -659,7 +679,7 @@ export function createGame(stage) {
     const lift = (holding ? u.holdLift : 0) + (thrusting ? hoverA(vy, u) : 0);
     const owed = Math.min(LOOK_AHEAD, Math.max(
       holding ? Math.max(0, u.holdMax - holdT) : 0,
-      thrusting ? u.fuel * Math.max(0.2, u.fuelMax) : 0));
+      thrusting ? u.fuel : 0));
     const g = -G * (vy < 0 ? Math.max(FALL_DRAG_MIN, u.fallDrag) : 1);
     const a1 = g + lift + ascendA(vy);
     if (t <= owed) return y + vy * t + 0.5 * a1 * t * t;
@@ -720,6 +740,14 @@ export function createGame(stage) {
         char.puff(0, 0.05, 0.1, 0.9);
       }
     } else if (state === 'run') {
+      // A press a few frames before the landing is the jump she meant, so it is replayed here,
+      // on the frame she is back on the dirt. It cannot buy her a rope: she still had to be off the
+      // floor when the sweep came round, and all the buffer fixes is reading early timing as no
+      // timing at all.
+      if (bufferT > 0) {
+        if (grounded) { bufferT = 0; pressEdge = true; }
+        else bufferT = Math.max(0, bufferT - dt);
+      }
       if (pressEdge) {
         if (grounded) {
           vy = u.jumpV;
@@ -738,13 +766,25 @@ export function createGame(stage) {
           vy = u.jumpV * 0.8;
           sfx.whoosh();
           char.bump(0.7);
+        } else bufferT = BUFFER;
+        // The braid drinks the beat, and only the beat: one press a revolution, and only as a rope
+        // passes under her feet. Holding the key through a climb therefore pays a fraction of what
+        // the burn costs, so 260 m is a passage she keeps time with instead of a key she leans on.
+        // No sound here on purpose - the whup is the braid's own voice, and the tank it is drawn
+        // from just went up.
+        if (!grounded && u.thrust > 0 && armed) {
+          armed = false;
+          if (ropes.ropes.some((r) => r.active && Math.cos(r.abs) > Math.cos(IGN_W))) {
+            u.fuel = Math.min(u.fuelMax, u.fuel + IGNITE);
+            char.bump(0.3, 0.2);
+          }
         }
       }
 
       holding = down && vy > 0 && holdT < u.holdMax;
       thrusting = !grounded && down && u.thrust > 0 && u.fuel > 0;
       if (holding) holdT += dt;
-      if (thrusting) u.fuel = Math.max(0, u.fuel - dt / Math.max(0.2, u.fuelMax));
+      if (thrusting) u.fuel = Math.max(0, u.fuel - dt);   // the tank is in seconds now
 
       let a = -G * (vy < 0 ? Math.max(FALL_DRAG_MIN, u.fallDrag) : 1);
       // The opening hop spends its assist here, so a held press and the press that started the
@@ -831,6 +871,14 @@ export function createGame(stage) {
       ropeBottom = ropes.update(state === 'run' || state === 'over' ? dt : 0, {
         hands, speed, length: ROPE_A, ground: 0, live: u.live, time,
       });
+      // The braid's charge is refilled once a revolution, and at the TOP of the sweep - half a
+      // turn before any rope reaches her feet (game.js:IGNITE). Refreshing it at the bottom would
+      // put the charge and the window in the same frame, which hands the fuel to anyone mashing
+      // the key; arming it here means a press on the way round spends the charge whether or not it
+      // was aimed. A rope stack makes the window easier to find without paying more per second
+      // than a single rope does, which is the trade for its trip risk.
+      const beat = Math.floor((ropes.ropes[0].theta + Math.PI) / (Math.PI * 2));
+      if (beat !== lastBeat) { lastBeat = beat; armed = true; }
 
       if (state === 'run') {
         const w = Math.max(0.14, ROPE_W - u.grace);
@@ -851,6 +899,7 @@ export function createGame(stage) {
           if (r.crossed) {
             if (clear) {
               u.skips++;
+              u.streak++;
               u.score = Math.round(u.score + multiplier());
               lastSkipT = time;
               // the rope rides her hands, so its gap to her feet is a constant;
@@ -898,7 +947,7 @@ export function createGame(stage) {
     // updated from inside the run branch, which meant a wipeout left the rope humming under
     // the game-over panel until the next run started.
     sfx.live(state === 'run' ? u.live : 0);
-    sfx.whup(state === 'run' && thrusting ? Math.max(0.25, u.fuel) : 0);
+    sfx.whup(state === 'run' && thrusting ? Math.max(0.25, u.fuel / Math.max(0.001, u.fuelMax)) : 0);
 
     // ---------------- camera ----------------
     // Parked, not tracking: her height alone never moves the picture. The frame slides

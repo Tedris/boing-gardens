@@ -27,6 +27,7 @@ One button does everything: space / up / W / click / tap.
 | Input   | Effect                                                  |
 | ------- | ------------------------------------------------------- |
 | Press   | leave the ground; the press that starts a run is its first jump |
+| Just before landing | a press up to four frames early is kept and fires on the frame she lands on |
 | Hold    | stay up longer on the way up; wind the braid and climb on the way down |
 | Release | let the arc fall                                         |
 | 1 / 2 / 3 | pick a card during a level-up (on touch, tap the card)   |
@@ -212,12 +213,20 @@ A better draw is the one card whose effect the deck bounds - past eight copies o
 nothing left to offer - and at that point the draft puts the whole eleven on screen in two rows,
 keyed 1 to 9, then 0, then -, because every card on the screen has to have a key of its own.
 
+The multiplier is a streak and not an odometer. The ladder it climbs is skips since the last rope
+she lost (`game.js:multiplier`), so the rope cushion and the score are the same number spent two
+ways. It used to read total skips, which meant the only way to lose it was to die and the cheapest
+strategy was to last; now a lost rope costs a rope *and* the run's place on the ladder, which is
+the decision the rope count was already asking for.
+
 Two gauges, deliberately unlike each other, because they answer different questions. The
 experience ladder runs along the bottom in rose and only exists while she is jumping: it is the
 one thing that tells you how far the next pick is. The braid's fuel is the blocked cyan column
 on the right edge, under the rope count, and it carries nothing else - it used to stand in for
 XP whenever no braid had been bought, which made one bar mean two different things depending on
-the last card taken.
+the last card taken. It is a clock rather than a fraction: a copy of Propeller Braid buys 1.95 s
+of burn (`cards.js:FUEL_S`), so four copies are 7.8 s of climb and half the column is half a
+tank at any depth of build.
 
 The braid is what turns the game from a jump-and-time loop into a climb-and-land loop, and it
 spins back up every time she touches the ground - not only on a pick, which left it with well
@@ -235,6 +244,16 @@ rule is that it replaces a fall. With the ceiling tied to `jumpV`, Higher Soles 
 climb again and Second Wind fires the moment she comes down, which is when a hop has something to
 replace. A braid that cannot beat gravity - one copy to three - has nothing to taper and stays the
 lift assist it always was.
+
+What pays for the climb is the rope. A press counts once per revolution, and only inside half the
+danger window around a rope at her feet (`game.js:IGNITE`, `IGN_W`), and it buys a second of burn
+back against a tank that drains a second a second. A revolution costs 1.33 s, so keeping time pays
+three quarters of the climb and leaning on the key pays nothing: held, eight copies of the braid
+reach 168 m and fall back short of the win, and pressed on the pass, six copies reach it in 26 s.
+The charge is refilled at the top of the sweep, half a turn before anything comes to her feet, so
+the first press of a revolution spends it whether or not it was aimed at a rope - which is what
+separates timing the beat from mashing the button. The fuel gauge is the tell: the braid's whup is
+drawn from the same number, so a clean press is heard as well as seen.
 
 ## Winning, and what it leaves behind
 
@@ -298,6 +317,8 @@ has nowhere to be shown, so the first touch of storage removes the key that held
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
 | `game.js` | `VY_MAX`, `ASCEND_DRAG` | the speed a climb tops out at, and how hard the air takes the excess back |
 | `game.js` | `HOVER_K` | the braid's ceiling in multiples of the launch speed: how fast a hover climbs, and why jump height raises it |
+| `game.js` | `IGNITE`, `IGN_W` | what a press on the beat buys the braid, and how narrow that beat is |
+| `game.js` | `BUFFER` | how early a press can be and still count as the landing's jump |
 | `game.js` | `FALL_DRAG_MIN` | how slow a fall may be slowed to, which is what keeps the descent arriving on the beat |
 | `rope.js` | `R`, `BOW` | rope thickness, and how far the arc swings wide aloft |
 | `rope.js` | `WHIP` | how far the sweep hangs aloft before it snaps past the feet |
@@ -309,6 +330,7 @@ has nowhere to be shown, so the first touch of storage removes the key that held
 | `toon.js` | `PIXEL_H`, `SNAP` | internal rows and the vertex-snap block: the resolution of the whole look |
 | `cards.js` | `CARDS` | the eleven upgrades and their numbers |
 | `cards.js` | `CRIT_BASE`, `CRIT_STEP` | the luck on any one skip, and what a Crit Caliper adds to it |
+| `cards.js` | `FUEL_S` | seconds of burn per Propeller Braid, so the card's number is the tank |
 | `roster.js` | `ROSTER` | the five jumpers: look and blurb, and no numbers of their own |
 | `records.js` | `BOARD`, `KEEP` | rows per board, and rows kept; kept rows are trimmed by rank, never by age |
 | `index.html` | `src/main.js?v=` | the entry's cache version: bump it to the commit you ship when anything under `src/` changes |
@@ -374,28 +396,43 @@ them, since nothing gates it any more.
 Caps came off every card, which moved the limits from the cards to the arithmetic. Twenty copies of
 each one were stacked on a fresh run and the button was mashed - a press edge on every frame, five
 seconds of it - and nothing produced a NaN or an error, or a run the player could not finish. What
-that took was two numbers, not two ceilings on cards. Ascent stops paying above 26 m/s (`VY_MAX`,
+holds them is two numbers, not two ceilings on cards: ascent stops paying above 26 m/s (`VY_MAX`,
 handed straight back as drag by `ASCEND_DRAG`, and stated once so the integrator and the camera's
-arc prediction cannot disagree about it), and the braid's lift stops paying at `HOVER_K * jumpV`,
-because thrust and fuel both grow with every Propeller Braid and their product is the speed a climb
-ends at: twenty of everything, mashed for five seconds, peaked at 174 m and was back on the dirt
-12.5 s after the button was let go, and twelve of everything peaked at 151 m and came down in 7.2 s.
-And a mid-air hop replaces the fall instead of adding to it - summed, twenty Second Winds left the
-ground at 74 m/s, which is tens of thousands of metres in a run and a descent that outlasts it.
-Ordinary play never reaches either term: a mid-run tap still peaks at 0.311 m and is off the ground
-for 0.317 s, and turns still measure 80 frames.
+arc prediction cannot disagree about it), and the braid's lift stops paying at `HOVER_K * jumpV`.
+Twenty of everything, mashed for five seconds, reached 158 m and was back on the dirt 13.1 s after
+the button was let go, and twelve of everything reached 136 m and landed 9.5 s later. Both falls are
+long because a braid whose tank is stated in seconds lives that long. And a mid-air hop replaces the
+fall instead of adding to it - summed, twenty Second Winds left the ground at 74 m/s, which is tens
+of thousands of metres in a run and a descent that outlasts it. Ordinary play never reaches either
+term: a mid-run tap still peaks at 0.311 m and is off the ground for 0.317 s, and turns still
+measure 80 frames.
 
 The braid's ceiling was read against the cards it used to silence, each of them one held press from
 a standing start with the level timer pinned so no draft broke the arc. A plain hop peaks at 0.7 m
-and Higher Soles x5 at 2.6 m; one braid lifts those to 1.3 m and 3.9 m, so both cards are still
+and Higher Soles x5 at 2.6 m; one braid lifts those to 1.3 m and 4.1 m, so both cards are still
 readable on the arc. Four braids then climb 54.7 m in six seconds at 9.3 m/s against an 8.4 m/s
-ceiling, and the same build with five Higher Soles in it covers 87.7 m at 15.8 m/s against 17.6 -
+ceiling, and the same build with five Higher Soles in it covers 87.4 m at 15.8 m/s against 17.6 -
 the jump sets the climb now, which is the stacking the flat version destroyed. Second Wind was read
-where it had been dead: pressed at 9.2 s of a four-braid climb, once the fuel had run out, `vy` went
-from -22.0 to +1.9 with the gate at 3.04, so the hop took. A press while she is still rising takes
-nothing and spends nothing, which is the same rule that keeps twenty Second Winds from becoming a
-rocket, and the card says so on its face. And the goal is still at the end of the climb: eight
-braids held through one press reach 260 m in 24.4 s, the same eight with five Higher Soles in 15 s.
+where it had been dead: pressed at 9.2 s of a four-braid climb, once the tank had run out, `vy` went
+from -20.8 to the hop's 3.04, so the hop took. A press while she is still rising takes nothing and
+spends nothing, which is the same rule that keeps twenty Second Winds from becoming a rocket, and
+the card says so on its face.
+
+The tank drains in the time it says it does - four braids burn from 7.8 to nothing in 7.8 s of held
+thrust - and what pays it back is the rope. Pressed as a rope passes her feet a press buys a second
+of burn, once per revolution, and the climb travels 11.2 m per revolution on it: the win arrived on
+six braids in 25.7 s and on eight in 24.4 s, with 17 ignitions out of 18 presses. Three ways of
+holding the same key were read against that number. Held through, eight braids reach 168 m and fall
+back short. Pressed at the top of the sweep, where a revolution's charge goes for nothing, the run
+is the identical run. Mashed, 2057 presses in 34 s bought one ignition.
+
+Two more are on the record beside it. A press kept for 50 ms is replayed on the landing frame: on a
+held arc that is airborne for 38 frames, presses 1, 2, 3 and 4 frames early - up to 67 ms - all
+leave the ground again on the frame she touches down, and a press 5 frames early does not. The
+buffer is deliberately shorter than the 117 ms a pass stays open, so it recovers early timing
+without answering a rope she was never above. And the multiplier reads the streak: a run handed two
+Combo Crowns and a streak of 90 paid 5 points for one skip, and the moment a rope was lost the
+streak was 0 and the chip off the screen with it.
 
 What the deck does bound is the draw. With Four-Leaf Sneaker taken past eight copies the draft has
 nothing left to add, so it shows all eleven cards in two wrapped rows keyed 1 to 9, then 0, then -;
