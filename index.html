@@ -11,8 +11,9 @@
   See README.md for the design/legal notes.
 
   Look: PS1-era pixel pass, flat slate HUD. Small plain sans, thin 1px rules, no
-  outlines, no shadows, generous empty space. Two colours only: rose for experience, and
-  the live-wire cyan for the braid's fuel - the two gauges have to be told apart at a glance.
+  outlines, no shadows, generous empty space. Two colours only: rose for experience and for
+  whatever a run won, and the live-wire cyan for the braid's fuel - the two gauges have to be
+  told apart at a glance.
 -->
 <style>
   :root{
@@ -51,7 +52,7 @@
     font:11px/1.5 ui-monospace,SFMono-Regular,monospace;pointer-events:none}
 
   /* tabular digits: every tick of the counter would otherwise shift the line */
-  #skipnum,.num,button,.stats b,#alt b{font-variant-numeric:tabular-nums}
+  #skipnum,.num,button,.stats b,.board b,#alt b{font-variant-numeric:tabular-nums}
 
   /* ---- skip counter ---- */
   #skips{
@@ -246,7 +247,27 @@
   #screen .stats{display:flex;gap:44px;justify-content:center;margin-top:28px}
   #screen .stats div{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--label)}
   #screen .stats b{display:block;margin-top:7px;font-size:22px;font-weight:500;color:var(--value)}
-  #s-best{color:var(--accent)}
+  #s-score{color:var(--accent)}
+  /* ---- saved runs: the two boards ---- */
+  /* The score a run banked and the height it reached are the only two numbers a run leaves
+     behind, so each gets its own board instead of one table sorted two ways. Both sit on the
+     panel rather than behind a menu, because the question they answer is asked the moment a run
+     ends and again before the next one starts. Value on the left, the jumper it belongs to on
+     the right, rank from the counter. Nothing in a row is allowed to wrap - the name is the one
+     field that can run long, so it takes sentence case and an ellipsis instead of a second line. */
+  #screen .boards{display:flex;gap:18px;justify-content:center;margin-top:30px}
+  #screen .board{width:min(44vw,244px);text-align:left;background:var(--panel);
+    border:1px solid var(--line);padding:9px 13px 11px}
+  #screen .board h3{font-size:10px;font-weight:400;letter-spacing:.24em;text-transform:uppercase;color:var(--label)}
+  #screen .board ol{list-style:none;margin-top:5px;counter-reset:row}
+  #screen .board li{display:flex;align-items:baseline;gap:9px;padding:3px 0;
+    border-top:1px solid var(--line);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
+  #screen .board li::before{counter-increment:row;content:counter(row);min-width:9px;font-size:9px}
+  #screen .board li b{font-size:14px;font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--value);white-space:nowrap}
+  #screen .board li i,#screen .board li em{font-style:normal;color:var(--accent);white-space:nowrap}
+  #screen .board li span{margin-left:auto;min-width:0;text-transform:none;letter-spacing:.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #screen .board li.mine b{color:var(--accent)}
   #screen .legal{
     margin:34px auto 0;max-width:46ch;font-size:10px;line-height:1.8;
     letter-spacing:.02em;color:var(--label);opacity:.85;
@@ -320,6 +341,9 @@
     #screen .how b{padding:6px 11px}
     #screen .stats{gap:30px;margin-top:20px}
     #screen .stats b{font-size:19px}
+    /* two boards will not sit side by side across a portrait phone */
+    #screen .boards{flex-direction:column;align-items:center;gap:12px;margin-top:22px}
+    #screen .board{width:min(88vw,340px)}
     #screen .go{margin-top:24px;font-size:11px;letter-spacing:.26em}
     #screen .legal{margin-top:20px;font-size:9px;line-height:1.7}
     /* the bottom strip of a portrait phone is crowded: the corner buttons own its right and the
@@ -343,6 +367,11 @@
     #screen .stats{gap:26px;margin-top:10px}
     #screen .stats div{font-size:9px}
     #screen .stats b{margin-top:4px;font-size:17px}
+    #screen .boards{margin-top:14px;gap:10px}
+    #screen .board{padding:6px 10px 8px}
+    #screen .board li{padding:2px 0}
+    /* a short screen has room for the top three, which is the whole point of the board */
+    #screen .board li:nth-child(n+4){display:none}
     #screen .go{margin-top:12px;font-size:10px;letter-spacing:.24em}
     #screen .legal{margin-top:12px;font-size:9px;line-height:1.5}
     #draft h2,#pick h2{font-size:10px;top:3vh}
@@ -402,7 +431,7 @@
   <div id="screen">
     <div class="panel">
       <h1>BOING<span>GARDENS</span></h1>
-      <p class="tag">One button. One rope. Endless altitude.</p>
+      <p class="tag">One button. One rope. All the way to space.</p>
       <div class="how">
         <b><span class="kbd">PRESS</span><span class="tch">TAP</span> &mdash; leave the ground</b>
         <b>HOLD &mdash; go higher</b>
@@ -411,7 +440,17 @@
       <div class="stats" id="stats" style="display:none">
         <div>SKIPS<b id="s-skips">0</b></div>
         <div>HEIGHT<b id="s-alt">0m</b></div>
-        <div>BEST<b id="s-best">0</b></div>
+        <div>SCORE<b id="s-score">0</b></div>
+      </div>
+      <div class="boards" id="boards" style="display:none">
+        <div class="board">
+          <h3>Top score</h3>
+          <ol id="b-score"></ol>
+        </div>
+        <div class="board">
+          <h3>Top height</h3>
+          <ol id="b-height"></ol>
+        </div>
       </div>
       <p class="go" id="go">PRESS SPACE</p>
       <p class="legal">An original toy. Characters, code, shading and sound generated here;

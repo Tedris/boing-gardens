@@ -1,7 +1,7 @@
 # Boing Gardens
 
-A one-button jump-rope toy that climbs forever. Original code, geometry, shading and
-sound — nothing in here came from another game.
+A one-button jump-rope toy with one goal: 260 metres up, where the air runs out. Original code,
+geometry, shading and sound — nothing in here came from another game.
 
 Run it:
 
@@ -27,7 +27,8 @@ One button does everything: space / up / W / click / tap.
 | P / Esc | pause, or resume                                           |
 | C       | swap jumper, but only while nothing is in motion             |
 
-A run ends when a rope reaches the bottom of its sweep while a foot is still on the dirt.
+A run ends one of two ways: a rope reaches the bottom of its sweep while a foot is still on the
+dirt, or she gets to 260 m, which ends it as a win (`game.js:WIN_H`, and its own section below).
 With more than one rope a trip costs a rope instead of the run: the sweep restarts at
 the top and she stumble-hops back in, so the last rope is the one that ends it. A rope that
 has just joined the sweep gets one turn of that rule suspended, and the ropes that survive a
@@ -217,6 +218,36 @@ spend height instead of luck: the climb is free until she has to come down, and 
 the one moment the rope can take a rope off her. A live wire doubles what the rope pays and
 changes how a wipeout looks, which is the whole cost.
 
+## Winning, and what it leaves behind
+
+There is one goal and it is a height: 260 m (`game.js:WIN_H`). The number is not a threshold picked
+for a trophy - it is where the stage stops having anything to say. `world.js:BANDS` runs out at
+150 m, the stars tier in above that, and the `space` ramp the fog is solved against is finished at
+260. The win is the place the scenery was already built to stop, and the run ends the moment she
+crosses it.
+
+Nothing drops her when it happens. The braid stops, the rope stays in her hands, and the way down is
+the ending: every skyline tier she climbed goes by in the wrong order, `coming down` on the hint
+line, and the panel comes up when she is back on the dirt - or after 4.6 s of descent, whichever
+comes first, because Puffy Overalls can stretch 260 m to eight seconds and that is a long time to
+make anyone watch. It reads `SPACE REACHED` where a trip reads `WIPEOUT`, over the one sound nothing
+else plays, and she is not limp on the way down: `dead` stays false, which is the flag the fall poses
+and the airborne pose both read, so a win brings her home upright (`game.js:winRun`).
+
+A finished run leaves two numbers behind, won or wiped out: the score it banked and the height it
+reached. Each one writes a row to `localStorage` under `boing-gardens-runs` (`records.js:addRun`),
+and the two boards on the title and ending panels are read straight off those rows, so a record can
+never disagree with the run it came from. Five rows to a board, twenty-four kept, and kept rows are
+trimmed by rank rather than by age - the row that goes is the one sitting worst on *both* boards, so
+a board cannot lose the record it is showing. The row this run wrote is marked `NEW`; a row that
+ended in a win is marked `SPACE` on the score board, and not on the height board, where the number
+already says it.
+
+That is everything that is remembered. The pick of jumper still is not saved - every opening frame is
+the roster's first row - and the one number this used to keep, the best skip count, is gone: skips are
+what raise a level rather than what a run is remembered by, and once there are two boards the number
+has nowhere to be shown, so the first touch of storage removes the key that held it.
+
 ## Staying clear of anyone's IP
 
 - Name, character design, palette, UI copy and card names are original. She has a teal bob
@@ -243,6 +274,7 @@ changes how a wipeout looks, which is the whole cost.
 | `game.js` | `ROPE_A` | rope length; sets how low the sweep passes |
 | `game.js` | `ROPE_W` | danger window around the bottom of the sweep |
 | `game.js` | `LEVEL_TIME`, `XP_WINDOW` | the wait a level is solved for, and how many levels the XP bar is drawn across |
+| `game.js` | `WIN_H` | the height that ends a run as a win: 260 m, where the `space` ramp the fog reads runs out |
 | `game.js` | `CAM_YAW`, `CAM_LIFT` | the three-quarter framing: side angle and tilt |
 | `game.js` | `CLEAR`, `DROP` | the vertical band she must stay inside: above for body and rope hump, below for shoes and ground |
 | `game.js` | `LOOK_AHEAD`, `CAM_CHASE` | how far the arc is predicted, and how fast a parked frame travels when it moves |
@@ -259,6 +291,7 @@ changes how a wipeout looks, which is the whole cost.
 | `cards.js` | `CARDS` | the eleven upgrades and their numbers |
 | `cards.js` | `CRIT_BASE`, `CRIT_STEP` | the luck on any one skip, and what a Crit Caliper adds to it |
 | `roster.js` | `ROSTER` | the five jumpers: look and blurb, and no numbers of their own |
+| `records.js` | `BOARD`, `KEEP` | rows per board, and rows kept; kept rows are trimmed by rank, never by age |
 
 ## Checks
 
@@ -350,3 +383,16 @@ is the pressure the removed ceiling used to supply and why a deep build is a bui
 its hops. Readability goes the same way in the picture rather than in the numbers - at six the
 sweep reads as nested stripes, at ten and past it is a solid shell around her, and the count on the
 right is what says how many are in it.
+
+Both endings and the boards were read the same way. A run left alone trips and banks its row: the
+panel came up with SKIPS 1 / HEIGHT 0m / SCORE 1, both boards carrying that row marked `NEW`, and the
+same two rows were on the title panel after a reload, which is the persistence claim tested. Crossing
+`WIN_H` ended the run as a win instead: the state went to `over` with `won` set and the panel held
+off through the descent, a 285 m fall that kept her framed and centred in the star band at every
+sample, and the panel arrived on touchdown about 3.2 s later over `SPACE REACHED`, with the height
+board reading 285 m and the score board marking the row `SPACE`. Six Puffy Overalls on the same run
+held the fall to two fifths of gravity and the panel came up at the 4.6 s ceiling with her still
+10 m off the ground, which is the one case that ceiling exists for. Storage read back as
+`{v:1,runs:[…]}` after every case; a machine holding only the old `boing-gardens-best` key came up
+with that key gone and no boards drawn at all; and forty synthetic runs left twenty-four with the top
+of both boards still in them.

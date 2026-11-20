@@ -141,6 +141,14 @@ export const sfx = {
     if (!ctx || muted) return;
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.24, { gain: 0.14, delay: i * 0.075 }));
   },
+  // The ending that is not a fall. level() opens a pick, so this takes the same notes an octave
+  // apart and slower, to close a run, with a low swell under them for the descent the panel
+  // waits out (game.js:winRun).
+  win() {
+    if (!ensure() || muted) return;
+    [392, 523, 659, 784, 1046, 1568].forEach((f, i) => tone(f, 0.55, { gain: 0.12, delay: i * 0.13 }));
+    tone(66, 2.2, { gain: 0.09, type: 'sine', slide: 40 });
+  },
   pick() {
     if (!ctx || muted) return;
     tone(760, 0.14, { gain: 0.13, slide: 480 });

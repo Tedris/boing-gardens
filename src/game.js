@@ -7,6 +7,7 @@ import { createRopes } from './rope.js';
 import { CARDS, drawCards, CRIT_BASE } from './cards.js';
 import { ROSTER, byId } from './roster.js';
 import { sfx } from './audio.js';
+import { addRun, board } from './records.js';
 import { C, createPost } from './toon.js';
 
 // The key that takes each card on screen: the number row, then 0, then the key after it. Drawn
@@ -65,10 +66,16 @@ const XP_WINDOW = 3;       // the XP bar is drawn across this many levels: the o
                            // a bar that empties every level. Later gaps are assumed to repeat the
                            // current one, which is a forecast and not a promise - a rope or a
                            // faster sweep re-solves the next threshold when it is reached.
+// The run's one goal, and the only height the game cares about. `space` in step() is fully
+// arrived at here (world.js:BANDS stops at 150 m and the stars tier in above that), so by the
+// time she reaches it the stage has nothing left to show her: the win is the place the scenery
+// was already built to stop, not a number invented for a trophy. Crossing it ends the run
+// (game.js:winRun). Twenty braids under a mashing thumb climb 153 m, so this is a good run
+// rather than a routine one, and the height board is what keeps the runs that fell short.
+const WIN_H = 260;         // metres
+
 const FALLS = ['crumple', 'topple', 'sit'];  // the shapes a wipeout can land in, picked at
                                              // random so no two runs end the same way
-
-const BEST_KEY = 'boing-gardens-best';
 
 // Framing: a slight three-quarter view, not a flat lay. Dead-on, every box collapses to
 // its front face and the rope sweep stops reading as depth; ~16 degrees of yaw keeps her
@@ -160,7 +167,10 @@ export function createGame(stage) {
     stats: document.getElementById('stats'),
     sSkips: document.getElementById('s-skips'),
     sAlt: document.getElementById('s-alt'),
-    sBest: document.getElementById('s-best'),
+    sScore: document.getElementById('s-score'),
+    boards: document.getElementById('boards'),
+    bScore: document.getElementById('b-score'),
+    bHeight: document.getElementById('b-height'),
     flash: document.getElementById('flash'),
     paused: document.getElementById('paused'),
     pick: document.getElementById('pick'),
@@ -200,7 +210,7 @@ export function createGame(stage) {
     u.xpNeed = levelGap();   // the first threshold, off the sweep rate
     y = 0; vy = 0; grounded = true; holdT = 0; holding = false; launchT = 0;
     camAnchor = 0; camY = 1.05;   // a new run frames the ground, not the last run's ceiling
-    airLeft = 0; thrusting = false; dead = false; deadT = 0;
+    airLeft = 0; thrusting = false; dead = false; deadT = 0; won = false;
     shake = 0; flash = 0; nearMiss = 0; lastSkipT = -9;
     stumbled = false; hintT = 0; lostHint = false;
     paused = false; el.paused.classList.remove('on');
@@ -211,7 +221,7 @@ export function createGame(stage) {
 
   let state = 'title';         // title | ready | run | draft | over
   let y = 0, vy = 0, grounded = true, holdT = 0, holding = false, launchT = 0;
-  let airLeft = 0, thrusting = false, dead = false, deadT = 0;
+  let airLeft = 0, thrusting = false, dead = false, deadT = 0, won = false;
   let shake = 0, flash = 0, nearMiss = 0, lastSkipT = -9;
   let pressEdge = false, down = false;
   let stumbled = false;        // a trip costs at most one rope per frame
@@ -244,6 +254,28 @@ export function createGame(stage) {
     renderOwned();
     const chip = el.owned.children[i];
     if (chip) chip.classList.add('bump');
+  }
+
+  /** The two boards a run is remembered by, straight off the saved rows. Both live on the panel
+   *  rather than behind a menu, because the question they answer - was that a good run? - is
+   *  asked while the panel is up and again before the next one starts. `mine` marks the row this
+   *  run wrote, so the answer does not mean searching five rows twice. */
+  function paintBoards(mine) {
+    const draw = (node, kind, value, marks) => {
+      node.innerHTML = '';
+      for (const r of board(kind)) {
+        const li = document.createElement('li');
+        li.innerHTML = `<b>${value(r)}</b>` + (marks && r.won ? '<i>SPACE</i>' : '') +
+          (r.id === mine ? '<em>NEW</em>' : '') + `<span>${r.jumper}</span>`;
+        if (r.id === mine) li.className = 'mine';
+        node.appendChild(li);
+      }
+    };
+    // The height board needs no win mark: a height at or past WIN_H *is* a win, since crossing
+    // it is what ended the run. On the score board the same fact is not visible in the number.
+    draw(el.bScore, 'score', (r) => r.score, true);
+    draw(el.bHeight, 'height', (r) => `${r.height} m`, false);
+    el.boards.style.display = board('score').length ? 'flex' : 'none';
   }
 
   /**
@@ -309,16 +341,18 @@ export function createGame(stage) {
   }
 
   // ---------------- flow ----------------
-  /** trip() writes the wipeout panel and copy, and nothing else puts them away,
-      so both entry points share this: pose, title copy, stats panel, camera. */
+  /** trip() and winRun() write the ending panel and its copy, and nothing else puts them away,
+      so every entry point shares this: pose, title copy, stats panel, the saved-run boards, and
+      the camera back down to the ground. */
   function resetScreen() {
     char.rig.hips.rotation.set(0, 0, 0);
     char.group.rotation.set(0, 0, 0);
     char.group.position.set(0, 0, 0);
     el.title.innerHTML = 'BOING<span>GARDENS</span>';
-    el.tag.textContent = 'One button. One rope. Endless altitude.';
+    el.tag.textContent = 'One button. One rope. All the way to space.';
     el.go.textContent = goText();
     el.stats.style.display = 'none';
+    paintBoards();   // the boards are the last thing a finished run leaves on screen
     camY = 1.05;
   }
 
@@ -352,6 +386,26 @@ export function createGame(stage) {
     hintT = 1.6; lostHint = true;
   }
 
+  /** One path for both endings: bank the run, fill the panel with what it got, and put the two
+   *  boards underneath so the run can be read against the ones before it. `deadT` restarts here
+   *  because step()'s `over` branch counts it to know when the ending has finished playing, and
+   *  the panel goes up the moment it has. */
+  function endRun(win) {
+    deadT = 0;
+    state = 'over';
+    const row = addRun({
+      score: u.score, height: Math.floor(u.altMax), skips: u.skips,
+      level: u.level, won: win, jumper: who().name,
+    });
+    el.sSkips.textContent = u.skips;
+    el.sAlt.textContent = `${Math.floor(u.altMax)}m`;
+    el.sScore.textContent = u.score;
+    el.stats.style.display = 'flex';
+    paintBoards(row.id);
+    el.go.textContent = goAgainText();
+    el.screen.classList.add('off');
+  }
+
   function trip() {
     // stumbled: a cluster of ropes can cross in the same frame, and one missed
     // jump has to cost one rope, not the whole bundle
@@ -359,8 +413,6 @@ export function createGame(stage) {
     stumbled = true;
     if (u.ropes > 1) { loseRope(); return; }
     dead = true;
-    deadT = 0;
-    state = 'over';
     shake = 1;
     vy = 3.4;
     // A live rope always ends it the same way; otherwise which fall she gets is drawn on the
@@ -371,17 +423,28 @@ export function createGame(stage) {
     if (fall === 'shock') sfx.zap();
     char.bump(-1.2, 0.6);
     sfx.fail();
-    const best = Math.max(+(localStorage.getItem(BEST_KEY) || 0), u.skips);
-    localStorage.setItem(BEST_KEY, String(best));
+    endRun(false);
     el.title.innerHTML = 'WIPE<span>OUT</span>';
     el.tag.textContent = `The rope won that one. ${u.score} points.`;
-    el.go.textContent = goAgainText();
-    el.sSkips.textContent = u.skips;
-    el.sAlt.textContent = `${Math.floor(u.altMax)}m`;
-    el.sBest.textContent = best;
-    el.stats.style.display = 'flex';
-    el.screen.classList.add('off');
     hint('');
+  }
+
+  /** The other way a run stops, and the only one that is not a fall: see WIN_H. Nothing here
+   *  drops her or lets go of the rope - `dead` stays false, so the character keeps the pose the
+   *  climb left her in and step()'s `over` branch brings her down. That descent is the ending:
+   *  the stage she just climbed goes by in the wrong order, and the panel waits for the landing. */
+  function winRun() {
+    won = true;
+    thrusting = false;    // the braid stops: there is nothing above here to climb to
+    shake = 0.7;
+    flash = 0.9;
+    sfx.win();
+    char.bump(0.7, 0.3);
+    endRun(true);
+    el.title.innerHTML = 'SPACE<span>REACHED</span>';
+    el.tag.textContent = `Out of the atmosphere at ${WIN_H} m. ${u.score} points.`;
+    hint('coming down');
+    hintT = 4.6; lostHint = true;   // the timer that hides the rope-loss hint covers this too
   }
 
   function levelUp() {
@@ -609,7 +672,6 @@ export function createGame(stage) {
       hintT -= dt;
       if (hintT <= 0) { hintT = 0; if (lostHint) { hint(''); lostHint = false } }
     }
-    const live = state === 'run' || state === 'ready' || state === 'over';
 
     if (state === 'ready') {
       // idle while the player gets the feel of the button
@@ -695,15 +757,30 @@ export function createGame(stage) {
       u.alt = y;
       u.altMax = Math.max(u.altMax, y);
       u.sinceSkip = y;
+      if (y >= WIN_H) winRun();   // the only way a run ends on its own terms
     } else if (state === 'over') {
       deadT += dt;
       if (!grounded || y > 0) {
+        const before = vy;
         vy -= G * dt;
         y = Math.max(0, y + vy * dt);
-        if (y <= 0) { y = 0; vy = 0; grounded = true; }
+        if (y <= 0) {
+          // The landing is the full stop at the end of the win's descent. A wipeout is already
+          // lying where it fell under its own sound, so the thud belongs to the win alone.
+          if (won && before < -6) {
+            sfx.land(Math.min(16, -before));
+            char.bump(-1.1, 0.18);
+            char.puff(0, 0.06, 0.15, 1.2);
+            shake = 0.5;
+          }
+          y = 0; vy = 0; grounded = true;
+        }
       }
-      // let the tumble land before the panel covers it
-      if (deadT > 1.15) el.screen.classList.remove('off');
+      // A wipeout is covered as soon as its tumble lands. A win is covered when she is back on
+      // the dirt, because the fall from WIN_H is the ending rather than a gap in it; the deadT
+      // ceiling is for a run that wins with Puffy Overalls aboard, where the drag floor stretches
+      // 260 m into eight seconds, which is too long a thing to make anyone watch.
+      if (won ? (grounded && deadT > 0.3) || deadT > 4.6 : deadT > 1.15) el.screen.classList.remove('off');
     }
 
     // ---------------- rope sweep + scoring ----------------
@@ -782,7 +859,9 @@ export function createGame(stage) {
     // ---------------- character ----------------
     char.update(dt, {
       time, y, vy,
-      grounded: state === 'over' ? false : grounded,
+      // Limp on a wipeout only: a win leaves her upright and still holding the rope, and the way
+      // down to the panel is a fall she is riding rather than one she has collapsed in.
+      grounded: dead ? false : grounded,
       phase: ropes.ropes[0].theta + ropes.ropes[0].offset,   // the clock, not the warped angle:
                                                              // the hands keep the beat, the rope
                                                              // whips through it
@@ -918,6 +997,7 @@ export function createGame(stage) {
           Math.round(char.group.rotation.z * 100) / 100, Math.round(char.group.rotation.x * 100) / 100],
         settle: ropes.ropes.filter((r) => r.active).map((r) => Math.round(r.settle * 100) / 100),
         xp: Math.round(u.xp * 10) / 10, xpNeed: u.xpNeed, crit: u.critChance, ropesMax: u.ropesMax,
+        score: u.score, won,
       };
     },
     /** drive the game from a script (used for automated checks) */
