@@ -494,6 +494,10 @@
       if (!window.game) fail('main.js never ran (a module this browser cannot parse?)');
     }, 1500));
   </script>
-  <script type="module" src="src/main.js"></script>
+  <!-- The one cache knob: bump this to the commit you are shipping whenever anything under
+       src/ changes. Pages serves every file at max-age=600, so without it a page loaded just
+       before a deploy can pair this fresh document with a cached entry module. Modules imported
+       *by* main.js keep their own ten-minute policy: this closes the HTML-to-entry straddle. -->
+  <script type="module" src="src/main.js?v=022d4b3"></script>
 </body>
 </html>

@@ -12,6 +12,13 @@ python3 -m http.server 8391    # or any static server
 
 `vendor/three.module.js` is three.js r170 (MIT), vendored so the page runs offline.
 
+`index.html` asks for `src/main.js?v=022d4b3`, and that query is the whole cache policy. GitHub Pages
+serves every file at `max-age=600`, so a returning reader revalidates within ten minutes - but a page
+loaded a minute before a deploy would otherwise pair a fresh document with a cached entry module,
+which is a new page running old code. Bump the query to the commit you are shipping whenever anything
+under `src/` changes; it is one line and nothing automates it. It covers the entry only, so the
+modules `main.js` imports still have a ten-minute window of their own at the far end.
+
 ## Controls
 
 One button does everything: space / up / W / click / tap.
@@ -292,6 +299,7 @@ has nowhere to be shown, so the first touch of storage removes the key that held
 | `cards.js` | `CRIT_BASE`, `CRIT_STEP` | the luck on any one skip, and what a Crit Caliper adds to it |
 | `roster.js` | `ROSTER` | the five jumpers: look and blurb, and no numbers of their own |
 | `records.js` | `BOARD`, `KEEP` | rows per board, and rows kept; kept rows are trimmed by rank, never by age |
+| `index.html` | `src/main.js?v=` | the entry's cache version: bump it to the commit you ship when anything under `src/` changes |
 
 ## Checks
 
